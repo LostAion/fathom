@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, CheckConstraint, Boolean, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -8,6 +8,7 @@ class Client(Base):
     client_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
     address = Column(String(255), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     policies = relationship("Policy", back_populates="client")
 
@@ -18,6 +19,7 @@ class Broker(Base):
     broker_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     agency_name = Column(String(100), nullable=False)
     licence_no = Column(String(50), unique=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     policies = relationship("Policy", back_populates="broker")
 
@@ -60,6 +62,7 @@ class Vessel(Base):
     imo_number = Column(String(20), unique=True, nullable=False)
     tonnage = Column(Integer, nullable=True)
     flag = Column(String(50), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     policies = relationship("Policy", back_populates="vessel")
     voyages = relationship("Voyage", back_populates="vessel")
@@ -104,6 +107,7 @@ class Policy(Base):
     __tablename__ = "POLICY"
     __table_args__ = (
         CheckConstraint("policy_type IN ('HULL', 'CARGO', 'PI')", name="check_policy_type"),
+        CheckConstraint("status IN ('DRAFT', 'QUOTED', 'BOUND', 'ACTIVE', 'CANCELLED')", name="check_policy_status"),
     )
 
     policy_no = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -115,6 +119,13 @@ class Policy(Base):
     vessel_value_covered = Column(Numeric(12, 2), nullable=True)
     cargo_type = Column(String(50), nullable=True)
     liability_limit = Column(Numeric(12, 2), nullable=True)
+    status = Column(String(20), default="DRAFT", nullable=False)
+    deductible = Column(Numeric(12, 2), default=10000.00, nullable=False)
+    underwriting_decision = Column(String(30), nullable=True)
+    risk_score = Column(Integer, nullable=True)
+    warranties = Column(Text, nullable=True)
+    awrp_surcharge = Column(Numeric(5, 2), default=0.00, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     client_id = Column(Integer, ForeignKey("CLIENT.client_id"), nullable=True)
     broker_id = Column(Integer, ForeignKey("BROKER.broker_id"), nullable=True)
@@ -133,10 +144,18 @@ class Policy(Base):
 
 class Claim(Base):
     __tablename__ = "CLAIM"
+    __table_args__ = (
+        CheckConstraint("status IN ('REPORTED', 'UNDER_SURVEY', 'APPROVED', 'SETTLED', 'REJECTED')", name="check_claim_status"),
+    )
 
     claim_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     loss_date = Column(Date, nullable=True)
     claim_amount = Column(Numeric(12, 2), nullable=True)
+    status = Column(String(20), default="REPORTED", nullable=False)
+    reserve_amount = Column(Numeric(12, 2), nullable=True)
+    deductible_applied = Column(Numeric(12, 2), default=0.00, nullable=False)
+    settled_amount = Column(Numeric(12, 2), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     policy_no = Column(Integer, ForeignKey("POLICY.policy_no"), nullable=True)
 
     policy = relationship("Policy", back_populates="claims")

@@ -3,13 +3,15 @@
 CREATE TABLE IF NOT EXISTS CLIENT (
     client_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    address VARCHAR(255)
+    address VARCHAR(255),
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE IF NOT EXISTS BROKER (
     broker_id INT AUTO_INCREMENT PRIMARY KEY,
     agency_name VARCHAR(100) NOT NULL,
-    licence_no VARCHAR(50) UNIQUE NOT NULL
+    licence_no VARCHAR(50) UNIQUE NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE IF NOT EXISTS SURVEYOR (
@@ -34,7 +36,8 @@ CREATE TABLE IF NOT EXISTS VESSEL (
     name VARCHAR(100) NOT NULL,
     imo_number VARCHAR(20) UNIQUE NOT NULL,
     tonnage INT,
-    flag VARCHAR(50)
+    flag VARCHAR(50),
+    is_active BOOLEAN DEFAULT TRUE
 );
 
 CREATE TABLE IF NOT EXISTS DEPARTMENT (
@@ -72,6 +75,13 @@ CREATE TABLE IF NOT EXISTS POLICY (
     vessel_value_covered DECIMAL(12, 2),
     cargo_type VARCHAR(50),
     liability_limit DECIMAL(12, 2),
+    status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'QUOTED', 'BOUND', 'ACTIVE', 'CANCELLED')),
+    deductible DECIMAL(12, 2) DEFAULT 10000.00,
+    underwriting_decision VARCHAR(30),
+    risk_score INT,
+    warranties TEXT,
+    awrp_surcharge DECIMAL(5, 2) DEFAULT 0.00,
+    is_active BOOLEAN DEFAULT TRUE,
     client_id INT,
     broker_id INT,
     emp_id INT,
@@ -88,6 +98,11 @@ CREATE TABLE IF NOT EXISTS CLAIM (
     claim_id INT AUTO_INCREMENT PRIMARY KEY,
     loss_date DATE,
     claim_amount DECIMAL(12, 2),
+    status VARCHAR(20) DEFAULT 'REPORTED' CHECK (status IN ('REPORTED', 'UNDER_SURVEY', 'APPROVED', 'SETTLED', 'REJECTED')),
+    reserve_amount DECIMAL(12, 2),
+    deductible_applied DECIMAL(12, 2) DEFAULT 0.00,
+    settled_amount DECIMAL(12, 2),
+    is_active BOOLEAN DEFAULT TRUE,
     policy_no INT,
     FOREIGN KEY (policy_no) REFERENCES POLICY(policy_no) ON DELETE CASCADE
 );
