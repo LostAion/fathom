@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 
 enum APIError: LocalizedError {
@@ -66,6 +67,13 @@ final class APIClient {
 
     func health() async throws -> Health {
         try await send("GET", "health")
+    }
+
+    func seaRoute(from origin: CLLocationCoordinate2D, to destination: CLLocationCoordinate2D) async throws -> SeaRoute {
+        try await send("GET", "sea-route/", query: [
+            "from_lat": "\(origin.latitude)", "from_lon": "\(origin.longitude)",
+            "to_lat": "\(destination.latitude)", "to_lon": "\(destination.longitude)",
+        ])
     }
 
     // MARK: - Transport

@@ -19,6 +19,7 @@ struct NetworkView: View {
             .overlay(alignment: .bottomTrailing) { addButton }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: NetworkRoute.self) { NetworkProfileView(route: $0) }
+            .appRoutes()
             .sheet(item: $creating) { NetworkEditor(route: $0) }
         }
     }

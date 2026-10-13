@@ -51,14 +51,19 @@ final class Ledger {
     @discardableResult
     func save<T: APIModel>(_ item: T, isNew: Bool) async throws -> T {
         let saved = isNew ? try await APIClient.shared.create(item) : try await APIClient.shared.update(item)
+        upsert(saved)
+        return saved
+    }
+
+    /// Stores a row the server returned, e.g. from `policies/{no}/bind` or `claims/{id}/settle`.
+    func upsert<T: APIModel>(_ item: T) {
         var list = all(T.self)
-        if let index = list.firstIndex(where: { $0.id == saved.id }) {
-            list[index] = saved
+        if let index = list.firstIndex(where: { $0.id == item.id }) {
+            list[index] = item
         } else {
-            list.append(saved)
+            list.append(item)
         }
         rows[T.collection] = list
-        return saved
     }
 
     /// Deletes cascade or null out foreign keys on the server, so reload everything afterwards.

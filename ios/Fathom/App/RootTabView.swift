@@ -7,19 +7,13 @@ struct RootTabView: View {
                 BridgeView()
             }
             Tab("Fleet", systemImage: "map") {
-                Screen(title: "Fleet", subtitle: "Vessels and voyages") {
-                    ChartingSoon()
-                }
+                FleetView()
             }
             Tab("Policies", systemImage: "shield.lefthalf.filled") {
-                Screen(title: "Policies", subtitle: "Hull, cargo and P&I cover") {
-                    ChartingSoon()
-                }
+                PoliciesView()
             }
             Tab("Claims", systemImage: "lifepreserver") {
-                Screen(title: "Claims", subtitle: "Incidents and settlements") {
-                    ChartingSoon()
-                }
+                ClaimsView()
             }
             Tab("Network", systemImage: "person.3") {
                 NetworkView()
@@ -30,19 +24,9 @@ struct RootTabView: View {
     }
 }
 
-/// Placeholder for tabs that are not built yet.
-private struct ChartingSoon: View {
-    var body: some View {
-        GlassCard {
-            Label("Still being charted", systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                .font(.rounded(.headline))
-                .foregroundStyle(Theme.inkMuted)
-        }
-    }
-}
-
 #Preview {
     RootTabView()
         .environment(ConnectionMonitor())
         .environment(Ledger())
+        .environment(SeaRoutes())
 }

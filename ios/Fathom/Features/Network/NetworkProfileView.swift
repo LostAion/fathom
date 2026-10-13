@@ -124,13 +124,19 @@ struct NetworkProfileView: View {
             let claimIDs = Set(ledger.assessedBy.filter { $0.surveyorId == route.key }.map(\.claimId))
             let claims = ledger.claims.filter { claimIDs.contains($0.claimId) }
             SectionHeader(title: "Claims surveyed", count: claims.count)
-            ForEach(claims) { ClaimRow(claim: $0) }
+            ForEach(claims) { claim in
+                NavigationLink(value: AppRoute.claim(claim.claimId)) { ClaimRow(claim: claim) }
+                    .buttonStyle(.plain)
+            }
         case .reinsurer:
             let shares = ledger.reinsuredBy.filter { $0.reinsurerId == route.key }
             SectionHeader(title: "Treaty shares", count: shares.count)
             ForEach(shares) { share in
                 if let policy = ledger.policies.first(where: { $0.policyNo == share.policyNo }) {
-                    PolicyRow(policy: policy, detail: "\(share.share?.formatted() ?? "–")% share")
+                    NavigationLink(value: AppRoute.policy(policy.policyNo)) {
+                        PolicyRow(policy: policy, detail: "\(share.share?.formatted() ?? "–")% share")
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -144,7 +150,10 @@ struct NetworkProfileView: View {
                 .font(.callout)
                 .foregroundStyle(Theme.inkMuted)
         }
-        ForEach(policies) { PolicyRow(policy: $0) }
+        ForEach(policies) { policy in
+            NavigationLink(value: AppRoute.policy(policy.policyNo)) { PolicyRow(policy: policy) }
+                .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Record
