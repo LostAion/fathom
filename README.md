@@ -1,6 +1,8 @@
 # Marine Insurance REST API (FastAPI + MariaDB)
 
-Backend CRUD API built with **FastAPI**, **SQLAlchemy**, and **MariaDB** (running in Podman). This service provides a complete RESTful interface designed specifically for consumption by frontend applications (React, Vue, Next.js, etc.).
+Backend CRUD API built with **FastAPI**, **SQLAlchemy**, and **MariaDB** (running in Podman). This service provides a complete RESTful interface designed specifically for consumption by frontend applications.
+
+> 📱 **Swift / iOS Developers**: Check out the dedicated [Swift / SwiftUI Frontend Handoff Guide](FRONTEND_HANDOFF_SWIFT.md) for ready-to-copy `Codable` structs, `async/await` API Client, and complete SwiftUI views.
 
 ---
 
