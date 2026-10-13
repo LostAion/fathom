@@ -20,6 +20,7 @@ from app.routers import (
     assessed_by,
     carries,
     concurrency,
+    sea_routes,
 )
 
 tags_metadata = [
@@ -37,6 +38,7 @@ tags_metadata = [
     {"name": "Reinsured By (Junction)", "description": "Mappings of policies to reinsurers and share percentages."},
     {"name": "Assessed By (Junction)", "description": "Mappings of claims to assessing surveyors."},
     {"name": "Carries (Junction)", "description": "Mappings of voyages carrying cargo shipments."},
+    {"name": "Sea Routes", "description": "Shipping-lane distances and paths between ports."},
 ]
 
 app = FastAPI(
@@ -96,4 +98,5 @@ app.include_router(reinsured_by.router, prefix=api_prefix)
 app.include_router(assessed_by.router, prefix=api_prefix)
 app.include_router(carries.router, prefix=api_prefix)
 app.include_router(concurrency.router, prefix=api_prefix)
+app.include_router(sea_routes.router, prefix=api_prefix)
 
