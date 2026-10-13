@@ -14,6 +14,16 @@ Ensure the MariaDB Podman container is running:
 podman start course-mariadb
 ```
 
+First time only, create the container and the tables:
+```bash
+podman machine init && podman machine start
+podman run -d --name course-mariadb -p 3306:3306 \
+  -e MARIADB_ROOT_PASSWORD=mysecretpassword docker.io/library/mariadb:11
+uv run python scripts/init_db.py
+uv run python scripts/seed_data.py
+```
+If port 3306 is already taken (e.g. by a local MySQL), use `-p 3307:3306` and set `DB_PORT=3307` in `.env`.
+
 ### 2. Start the Backend Server
 Run using `uv` (recommended):
 ```bash

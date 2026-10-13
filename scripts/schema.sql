@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS POLICY (
     vessel_value_covered DECIMAL(12, 2),
     cargo_type VARCHAR(50),
     liability_limit DECIMAL(12, 2),
+    status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'QUOTED', 'BOUND', 'ACTIVE', 'CANCELLED')),
+    deductible DECIMAL(12, 2) DEFAULT 10000.00,
     client_id INT,
     broker_id INT,
     emp_id INT,
@@ -88,6 +90,9 @@ CREATE TABLE IF NOT EXISTS CLAIM (
     claim_id INT AUTO_INCREMENT PRIMARY KEY,
     loss_date DATE,
     claim_amount DECIMAL(12, 2),
+    status VARCHAR(20) DEFAULT 'REPORTED' CHECK (status IN ('REPORTED', 'UNDER_SURVEY', 'APPROVED', 'SETTLED', 'REJECTED')),
+    deductible_applied DECIMAL(12, 2) DEFAULT 0.00,
+    settled_amount DECIMAL(12, 2),
     policy_no INT,
     FOREIGN KEY (policy_no) REFERENCES POLICY(policy_no) ON DELETE CASCADE
 );
