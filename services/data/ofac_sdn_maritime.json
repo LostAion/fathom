@@ -1,0 +1,41 @@
+{
+  "updated_at": "2026-10-13",
+  "description": "OFAC SDN Maritime Sanctioned Entities and Vessels for Compliance Screening",
+  "sanctioned_vessels": [
+    {
+      "imo_number": "IMO8912345",
+      "vessel_name": "NEVA LEADER",
+      "flag": "Russia",
+      "program": "RUSSIA-EO14024",
+      "reason": "Operating in the marine sector of the Russian Federation economy, petroleum transport"
+    },
+    {
+      "imo_number": "IMO9135790",
+      "vessel_name": "SEA GLORY",
+      "flag": "Iran",
+      "program": "IRAN-EO13846",
+      "reason": "Involved in illicit petroleum export on behalf of sanctioned entity"
+    },
+    {
+      "imo_number": "IMO9001234",
+      "vessel_name": "BLACK PEARL IV",
+      "flag": "DPRK",
+      "program": "DPRK4",
+      "reason": "Ship-to-ship transfer of prohibited bulk commodities"
+    },
+    {
+      "imo_number": "IMO9456789",
+      "vessel_name": "OCEAN PHANTOM",
+      "flag": "Unknown",
+      "program": "SDGT",
+      "reason": "Associated with illicit maritime smuggling network and AIS spoofing"
+    }
+  ],
+  "sanctioned_entities": [
+    "Sovcomflot Maritime OJSC",
+    "National Iranian Tanker Company",
+    "Ocean Maritime Management Company",
+    "Volga Shipping Logistics Ltd",
+    "Red Star Shipping Services"
+  ]
+}
