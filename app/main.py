@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
+from sqlalchemy.exc import IntegrityError
 from app.config import settings
 
 # Import routers
@@ -19,6 +20,7 @@ from app.routers import (
     reinsured_by,
     assessed_by,
     carries,
+    underwriting,
 )
 
 tags_metadata = [
@@ -64,6 +66,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global Database IntegrityError Handler
+@app.exception_handler(IntegrityError)
+async def integrity_error_exception_handler(request: Request, exc: IntegrityError):
+    orig = getattr(exc, "orig", None)
+    error_detail = str(orig) if orig else str(exc)
+    return JSONResponse(
+        status_code=400,
+        content={"detail": f"Database integrity error: {error_detail}"}
+    )
+
 # Root endpoint redirects to Swagger Docs
 @app.get("/", include_in_schema=False)
 def root():
@@ -94,3 +106,5 @@ app.include_router(claims.router, prefix=api_prefix)
 app.include_router(reinsured_by.router, prefix=api_prefix)
 app.include_router(assessed_by.router, prefix=api_prefix)
 app.include_router(carries.router, prefix=api_prefix)
+app.include_router(underwriting.router, prefix=api_prefix)
+
