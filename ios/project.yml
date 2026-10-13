@@ -30,7 +30,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.fathom.marine
         TARGETED_DEVICE_FAMILY: "1"
     scheme:
-      testTargets: [FathomTests]
+      testTargets: [FathomTests, FathomUITests]
   FathomTests:
     type: bundle.unit-test
     platform: iOS
@@ -38,5 +38,19 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Fathom
+  FathomUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [FathomUITests]
+    settings:
+      base:
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+    info:
+      path: FathomUITests/Info.plist
+      properties:
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
     dependencies:
       - target: Fathom

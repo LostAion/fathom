@@ -14,6 +14,10 @@ enum Theme {
     static let amber = Color(light: 0xC9781E, dark: 0xF4A261)
     /// Claims / losses / errors.
     static let coral = Color(light: 0xD9483B, dark: 0xFF6B6B)
+
+    /// Extra hues for telling entity kinds apart; they carry no status meaning.
+    static let sky = Color(light: 0x2F6FA8, dark: 0x5DA9E9)
+    static let lavender = Color(light: 0x5B4BC4, dark: 0x9B8CFF)
 }
 
 extension Font {

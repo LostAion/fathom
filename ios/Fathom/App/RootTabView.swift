@@ -22,9 +22,7 @@ struct RootTabView: View {
                 }
             }
             Tab("Network", systemImage: "person.3") {
-                Screen(title: "Network", subtitle: "Clients, brokers and partners") {
-                    ChartingSoon()
-                }
+                NetworkView()
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
@@ -46,4 +44,5 @@ private struct ChartingSoon: View {
 #Preview {
     RootTabView()
         .environment(ConnectionMonitor())
+        .environment(Ledger())
 }

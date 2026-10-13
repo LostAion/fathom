@@ -3,12 +3,17 @@ import SwiftUI
 @main
 struct FathomApp: App {
     @State private var connection = ConnectionMonitor()
+    @State private var ledger = Ledger()
 
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .environment(connection)
-                .task { await connection.check() }
+                .environment(ledger)
+                .task {
+                    await connection.check()
+                    await ledger.refresh()
+                }
         }
     }
 }

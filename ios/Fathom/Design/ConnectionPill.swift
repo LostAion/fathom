@@ -47,6 +47,7 @@ struct ConnectionPill: View {
 
 private struct ServerSheet: View {
     @Environment(ConnectionMonitor.self) private var connection
+    @Environment(Ledger.self) private var ledger
     @Environment(\.dismiss) private var dismiss
     @AppStorage(APIClient.baseURLKey) private var baseURL = APIClient.defaultBaseURL
 
@@ -88,7 +89,10 @@ private struct ServerSheet: View {
                     Button("Connect") {
                         Task {
                             await connection.check()
-                            if case .online = connection.state { dismiss() }
+                            if case .online = connection.state {
+                                dismiss()
+                                await ledger.refresh()
+                            }
                         }
                     }
                 }
