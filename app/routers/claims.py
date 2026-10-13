@@ -28,26 +28,44 @@ def get_claims(
     response.headers["X-Total-Count"] = str(total)
     return query.offset(skip).limit(limit).all()
 
+from sqlalchemy import func
+
 @router.post("/{claim_id}/settle", response_model=ClaimRead)
 def settle_claim(claim_id: int, db: Session = Depends(get_db)):
-    """Settle a claim applying policy deductibles and sum insured limits."""
+    """
+    Settle a claim enforcing both deductibles and cumulative aggregate policy limits.
+    Transactionally locks the policy row (SELECT ... FOR UPDATE) to prevent concurrent limit breaches.
+    """
     claim = db.query(Claim).filter(Claim.claim_id == claim_id).first()
     if not claim:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Claim not found")
 
-    policy = db.query(Policy).filter(Policy.policy_no == claim.policy_no).first()
+    # Lock policy row to prevent concurrent claims from over-settling
+    policy = db.query(Policy).filter(Policy.policy_no == claim.policy_no).with_for_update().first()
     if not policy:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Associated policy not found")
 
     claim_val = Decimal(str(claim.claim_amount or 0.0))
-    sum_insured = Decimal(str(policy.sum_insured or claim_val))
+    sum_insured = Decimal(str(policy.sum_insured or 0.0))
     deductible = Decimal(str(policy.deductible or 0.0))
 
-    effective_loss = min(claim_val, sum_insured)
-    net_payout = max(Decimal("0.00"), effective_loss - deductible)
+    # Calculate cumulative prior settlements under this policy
+    prior_settled = db.query(func.coalesce(func.sum(Claim.settled_amount), 0)).filter(
+        Claim.policy_no == policy.policy_no,
+        Claim.claim_id != claim_id,
+        Claim.status == "SETTLED"
+    ).scalar()
+
+    remaining_aggregate = max(Decimal("0.00"), sum_insured - Decimal(str(prior_settled)))
+
+    # Apply per-claim deductible first
+    net_claim_after_deductible = max(Decimal("0.00"), claim_val - deductible)
+
+    # Cap by remaining aggregate policy limit
+    final_payout = min(net_claim_after_deductible, remaining_aggregate)
 
     claim.deductible_applied = deductible
-    claim.settled_amount = net_payout
+    claim.settled_amount = final_payout
     claim.status = "SETTLED"
     db.commit()
     db.refresh(claim)

@@ -2,20 +2,20 @@
 """
 DBMS Concurrency Control Demonstration Script
 ==============================================
-Simulates two concurrent transactions attempting to draw from the same Policy Sum Insured.
+Simulates two concurrent transactions attempting to draw from the same Policy Aggregate Limit.
 
 Demonstrates:
-  Part 1: The Race Condition (Lost Update / Limit Breach without row locks).
-  Part 2: ACID Transaction Serialization using MariaDB Row-Level Locking (SELECT ... FOR UPDATE).
+  Part 1: The Race Condition (Lost Invariant / Over-allocation due to concurrent uncoordinated reads).
+  Part 2: ACID Transaction Serialization using MariaDB InnoDB Row-Level Locking (SELECT ... FOR UPDATE).
 """
 
 import sys
 import os
 import time
+import threading
 from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
 
-# Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from sqlalchemy import func
@@ -54,32 +54,40 @@ def setup_policy():
     return p_no
 
 def run_unsafe_race_condition():
-    print(f"\n{BOLD}{YELLOW}=================================================================={RESET}")
-    print(f"{BOLD}PART 1: UNLOCKED CONCURRENT TRANSACTIONS (RACE CONDITION / ANOMALY){RESET}")
-    print(f"{BOLD}{YELLOW}=================================================================={RESET}")
-    
+    print(f"\n{BOLD}{YELLOW}========================================================================{RESET}")
+    print(f"{BOLD}PART 1: UNLOCKED CONCURRENT TRANSACTIONS (LOST INVARIANT RACE CONDITION){RESET}")
+    print(f"{BOLD}{YELLOW}========================================================================{RESET}")
+
     policy_no = setup_policy()
-    print(f"Created Policy #{policy_no} with Sum Insured: {CYAN}$100,000.00{RESET}")
+    print(f"Created Policy #{policy_no} with Aggregate Limit: {CYAN}$100,000.00{RESET}")
     print(f"Two concurrent adjusters submit {YELLOW}$60,000.00{RESET} claims simultaneously.\n")
 
+    barrier = threading.Barrier(2)
+    start_time = time.perf_counter()
+
     def worker(name):
+        barrier.wait()
         db = SessionLocal()
+        t_start = time.perf_counter() - start_time
         pol = db.query(Policy).filter(Policy.policy_no == policy_no).first()
-        paid = db.query(func.coalesce(func.sum(Claim.claim_amount), 0)).filter(
-            Claim.policy_no == policy_no
+        paid = db.query(func.coalesce(func.sum(Claim.settled_amount), 0)).filter(
+            Claim.policy_no == policy_no,
+            Claim.status == "SETTLED"
         ).scalar()
         avail = pol.sum_insured - Decimal(str(paid))
-        print(f"  {CYAN}[{name}]{RESET} Read available limit: ${avail:,.2f}")
+        print(f"  {CYAN}[{name} @ {t_start:.3f}s]{RESET} Unlocked Read: Available aggregate capacity = ${avail:,.2f}")
 
         # Simulate concurrent processing delay
-        time.sleep(0.15)
+        time.sleep(0.12)
 
         if Decimal("60000.00") <= avail:
-            cl = Claim(policy_no=policy_no, claim_amount=Decimal("60000.00"), status="SETTLED")
+            cl = Claim(policy_no=policy_no, claim_amount=Decimal("60000.00"), status="SETTLED", settled_amount=Decimal("60000.00"))
             db.add(cl)
             db.commit()
-            print(f"  {GREEN}[{name}] APPROVED & COMMITTED $60,000.00 claim!{RESET}")
+            t_done = time.perf_counter() - start_time
+            print(f"  {GREEN}[{name} @ {t_done:.3f}s] APPROVED & COMMITTED $60,000.00 based on initial read!{RESET}")
         else:
+            db.rollback()
             print(f"  {RED}[{name}] REJECTED!{RESET}")
         db.close()
 
@@ -90,71 +98,88 @@ def run_unsafe_race_condition():
         f2.result()
 
     db = SessionLocal()
-    total = db.query(func.coalesce(func.sum(Claim.claim_amount), 0)).filter(
-        Claim.policy_no == policy_no
+    total = db.query(func.coalesce(func.sum(Claim.settled_amount), 0)).filter(
+        Claim.policy_no == policy_no,
+        Claim.status == "SETTLED"
     ).scalar()
     db.close()
 
     print(f"\n{BOLD}Final Result:{RESET}")
-    print(f"  Policy Limit:    $100,000.00")
+    print(f"  Aggregate Limit: $100,000.00")
     print(f"  Total Payout:    {RED}${total:,.2f}{RESET}")
     if total > 100000.00:
-        print(f"  {RED}{BOLD}ANOMALY DETECTED: Over-payment breach of ${(total - 100000):,.2f}!{RESET}")
-        print("  Cause: Dirty/Non-repeatable read without pessimistic locking.")
+        print(f"  {RED}{BOLD}INVARIANT VIOLATED: Aggregate coverage overdrawn by ${(total - 100000):,.2f}!{RESET}")
+        print("  Academic Cause: Concurrent read-modify-write race condition without locking serialization.")
 
 def run_safe_pessimistic_lock():
-    print(f"\n{BOLD}{CYAN}=================================================================={RESET}")
-    print(f"{BOLD}PART 2: ACID TRANSACTION CONCURRENCY (PESSIMISTIC FOR UPDATE LOCK){RESET}")
-    print(f"{BOLD}{CYAN}=================================================================={RESET}")
+    print(f"\n{BOLD}{CYAN}========================================================================{RESET}")
+    print(f"{BOLD}PART 2: ACID TRANSACTION CONCURRENCY (PESSIMISTIC SELECT ... FOR UPDATE){RESET}")
+    print(f"{BOLD}{CYAN}========================================================================{RESET}")
 
     policy_no = setup_policy()
-    print(f"Created Policy #{policy_no} with Sum Insured: {CYAN}$100,000.00{RESET}")
-    print(f"Two concurrent adjusters submit {YELLOW}$60,000.00{RESET} claims using MariaDB row locks.\n")
+    print(f"Created Policy #{policy_no} with Aggregate Limit: {CYAN}$100,000.00{RESET}")
+    print(f"Two concurrent adjusters submit {YELLOW}$60,000.00{RESET} claims using MariaDB InnoDB row locks.\n")
 
-    def worker(name):
+    barrier = threading.Barrier(2)
+    start_time = time.perf_counter()
+
+    def worker(name, hold_duration, start_delay):
+        barrier.wait()
+        time.sleep(start_delay)
         db = SessionLocal()
-        print(f"  {CYAN}[{name}]{RESET} Executing: SELECT ... FOR UPDATE (Requesting exclusive lock)")
-        
+        t_req = time.perf_counter() - start_time
+        print(f"  {CYAN}[{name} @ {t_req:.3f}s]{RESET} Requesting lock: SELECT ... FOR UPDATE on Policy #{policy_no}")
+
         # PESSIMISTIC ROW-LEVEL LOCK
         pol = db.query(Policy).filter(Policy.policy_no == policy_no).with_for_update().first()
-        print(f"  {GREEN}[{name}] ACQUIRED row lock on Policy #{policy_no}{RESET}")
+        t_acq = time.perf_counter() - start_time
+        wait_time = t_acq - t_req
+        print(f"  {GREEN}[{name} @ {t_acq:.3f}s] ACQUIRED row lock! (Waited {wait_time:.3f}s in lock queue){RESET}")
 
-        paid = db.query(func.coalesce(func.sum(Claim.claim_amount), 0)).filter(
-            Claim.policy_no == policy_no
+        time.sleep(hold_duration)
+
+        paid = db.query(func.coalesce(func.sum(Claim.settled_amount), 0)).filter(
+            Claim.policy_no == policy_no,
+            Claim.status == "SETTLED"
         ).scalar()
         avail = pol.sum_insured - Decimal(str(paid))
-        print(f"  {CYAN}[{name}]{RESET} Actual remaining limit: ${avail:,.2f}")
-
-        time.sleep(0.15)
+        print(f"  {CYAN}[{name} @ {time.perf_counter() - start_time:.3f}s]{RESET} Verified available limit: ${avail:,.2f}")
 
         if Decimal("60000.00") <= avail:
-            cl = Claim(policy_no=policy_no, claim_amount=Decimal("60000.00"), status="SETTLED")
+            cl = Claim(policy_no=policy_no, claim_amount=Decimal("60000.00"), status="SETTLED", settled_amount=Decimal("60000.00"))
             db.add(cl)
+            t_pre = time.perf_counter() - start_time
+            print(f"  {GREEN}[{name} @ {t_pre:.3f}s] Submitting COMMIT to MariaDB (will release exclusive lock)...{RESET}")
             db.commit()
-            print(f"  {GREEN}[{name}] COMMITTED $60,000.00 and RELEASED lock.{RESET}")
+            t_done = time.perf_counter() - start_time
+            print(f"  {GREEN}[{name} @ {t_done:.3f}s] Transaction committed successfully. Lock released.{RESET}")
         else:
+            t_pre = time.perf_counter() - start_time
+            print(f"  {RED}[{name} @ {t_pre:.3f}s] $60k exceeds available ${avail:,.2f} -> Submitting ROLLBACK...{RESET}")
             db.rollback()
-            print(f"  {RED}[{name}] $60,000.00 exceeds remaining ${avail:,.2f} -> ROLLED BACK & RELEASED lock.{RESET}")
+            t_done = time.perf_counter() - start_time
+            print(f"  {RED}[{name} @ {t_done:.3f}s] Transaction rolled back. Lock released.{RESET}")
         db.close()
 
     with ThreadPoolExecutor(max_workers=2) as ex:
-        f1 = ex.submit(worker, "Thread-1")
-        f2 = ex.submit(worker, "Thread-2")
+        f1 = ex.submit(worker, "Thread-1", 0.20, 0.0)
+        f2 = ex.submit(worker, "Thread-2", 0.05, 0.04)
         f1.result()
         f2.result()
 
     db = SessionLocal()
-    total = db.query(func.coalesce(func.sum(Claim.claim_amount), 0)).filter(
-        Claim.policy_no == policy_no
+    total = db.query(func.coalesce(func.sum(Claim.settled_amount), 0)).filter(
+        Claim.policy_no == policy_no,
+        Claim.status == "SETTLED"
     ).scalar()
     db.close()
 
     print(f"\n{BOLD}Final Result:{RESET}")
-    print(f"  Policy Limit:    $100,000.00")
+    print(f"  Aggregate Limit: $100,000.00")
     print(f"  Total Payout:    {GREEN}${total:,.2f}{RESET}")
     if total <= 100000.00:
-        print(f"  {GREEN}{BOLD}ACID CONSISTENCY MAINTAINED: No over-payment!{RESET}")
-        print("  Mechanism: MariaDB row-level exclusive lock serialized the concurrent transactions.")
+        print(f"  {GREEN}{BOLD}INVARIANT PRESERVED: Aggregate policy limit safely maintained!{RESET}")
+        print("  Academic Mechanism: MariaDB InnoDB exclusive row lock serialized the transactions, enforcing consistency.")
 
 if __name__ == "__main__":
     run_unsafe_race_condition()

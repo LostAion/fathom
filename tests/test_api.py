@@ -162,3 +162,42 @@ def test_junction_reinsured_by():
 
     # Clean up temp reinsurer
     client.delete(f"/api/reinsurers/{r_id}")
+
+def test_cumulative_aggregate_limit_enforcement():
+    # 1. Create client and policy with $100,000 aggregate sum insured and $5,000 deductible
+    c_res = client.post("/api/clients/", json={"name": "Aggregate Limit Test Client"})
+    client_id = c_res.json()["client_id"]
+
+    p_res = client.post("/api/policies/", json={
+        "client_id": client_id,
+        "policy_type": "CARGO",
+        "sum_insured": "100000.00",
+        "deductible": "5000.00",
+        "status": "BOUND"
+    })
+    policy_no = p_res.json()["policy_no"]
+
+    # 2. Claim 1: $60,000. Payout = min(60000 - 5000, 100000) = $55,000.
+    cl1 = client.post("/api/claims/", json={"policy_no": policy_no, "claim_amount": "60000.00"}).json()
+    settle1 = client.post(f"/api/claims/{cl1['claim_id']}/settle").json()
+    assert float(settle1["settled_amount"]) == 55000.00
+    assert float(settle1["deductible_applied"]) == 5000.00
+
+    # 3. Claim 2: $60,000. Remaining aggregate = $100,000 - $55,000 = $45,000.
+    # Net claim after deductible = $55,000, capped by remaining aggregate limit = $45,000.
+    cl2 = client.post("/api/claims/", json={"policy_no": policy_no, "claim_amount": "60000.00"}).json()
+    settle2 = client.post(f"/api/claims/{cl2['claim_id']}/settle").json()
+    assert float(settle2["settled_amount"]) == 45000.00
+
+    # 4. Total settled claims now = $55,000 + $45,000 = $100,000 (Limit reached).
+    # Claim 3: $20,000. Remaining aggregate = $0.00.
+    cl3 = client.post("/api/claims/", json={"policy_no": policy_no, "claim_amount": "20000.00"}).json()
+    settle3 = client.post(f"/api/claims/{cl3['claim_id']}/settle").json()
+    assert float(settle3["settled_amount"]) == 0.00
+
+    # Clean up
+    for c_id in [cl1["claim_id"], cl2["claim_id"], cl3["claim_id"]]:
+        client.delete(f"/api/claims/{c_id}")
+    client.delete(f"/api/policies/{policy_no}")
+    client.delete(f"/api/clients/{client_id}")
+
