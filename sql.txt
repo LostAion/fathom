@@ -1,0 +1,120 @@
+-- 1. INDEPENDENT TABLES (No Foreign Keys)
+
+CREATE TABLE CLIENT (
+    client_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    address VARCHAR(255)
+);
+
+CREATE TABLE BROKER (
+    broker_id INT PRIMARY KEY,
+    agency_name VARCHAR(100) NOT NULL,
+    licence_no VARCHAR(50) UNIQUE NOT NULL
+);
+
+CREATE TABLE SURVEYOR (
+    surveyor_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    qualification VARCHAR(100)
+);
+
+CREATE TABLE REINSURER (
+    reinsurer_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE CARGO (
+    cargo_id INT PRIMARY KEY,
+    description VARCHAR(255),
+    value DECIMAL(12, 2)
+);
+
+CREATE TABLE VESSEL (
+    vessel_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    imo_number VARCHAR(20) UNIQUE NOT NULL,
+    tonnage INT,
+    flag VARCHAR(50)
+);
+
+CREATE TABLE DEPARTMENT (
+    dept_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    location VARCHAR(100)
+);
+
+-- 2. DEPENDENT TABLES (Contains Foreign Keys)
+
+CREATE TABLE UNDERWRITER (
+    emp_id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    designation VARCHAR(50),
+    dept_id INT,
+    FOREIGN KEY (dept_id) REFERENCES DEPARTMENT(dept_id)
+);
+
+CREATE TABLE VOYAGE (
+    voyage_id INT PRIMARY KEY,
+    origin_port VARCHAR(100),
+    dest_port VARCHAR(100),
+    depart_date DATE,
+    vessel_id INT,
+    FOREIGN KEY (vessel_id) REFERENCES VESSEL(vessel_id)
+);
+
+CREATE TABLE POLICY (
+    policy_no INT PRIMARY KEY,
+    issue_date DATE,
+    expiry_date DATE,
+    premium DECIMAL(10, 2),
+    sum_insured DECIMAL(12, 2),
+    policy_type VARCHAR(20) CHECK (policy_type IN ('HULL', 'CARGO', 'PI')),
+    vessel_value_covered DECIMAL(12, 2),
+    cargo_type VARCHAR(50),
+    liability_limit DECIMAL(12, 2),
+    client_id INT,
+    broker_id INT,
+    emp_id INT,
+    vessel_id INT,
+    cargo_id INT,
+    FOREIGN KEY (client_id) REFERENCES CLIENT(client_id),
+    FOREIGN KEY (broker_id) REFERENCES BROKER(broker_id),
+    FOREIGN KEY (emp_id) REFERENCES UNDERWRITER(emp_id),
+    FOREIGN KEY (vessel_id) REFERENCES VESSEL(vessel_id),
+    FOREIGN KEY (cargo_id) REFERENCES CARGO(cargo_id)
+);
+
+CREATE TABLE CLAIM (
+    claim_id INT PRIMARY KEY,
+    loss_date DATE,
+    claim_amount DECIMAL(12, 2),
+    policy_no INT,
+    FOREIGN KEY (policy_no) REFERENCES POLICY(policy_no)
+);
+
+-- 3. JUNCTION TABLES (Many-to-Many Relationships)
+
+CREATE TABLE REINSURED_BY (
+    policy_no INT,
+    reinsurer_id INT,
+    share_percent DECIMAL(5, 2),
+    PRIMARY KEY (policy_no, reinsurer_id),
+    FOREIGN KEY (policy_no) REFERENCES POLICY(policy_no),
+    FOREIGN KEY (reinsurer_id) REFERENCES REINSURER(reinsurer_id)
+);
+
+CREATE TABLE ASSESSED_BY (
+    claim_id INT,
+    surveyor_id INT,
+    PRIMARY KEY (claim_id, surveyor_id),
+    FOREIGN KEY (claim_id) REFERENCES CLAIM(claim_id),
+    FOREIGN KEY (surveyor_id) REFERENCES SURVEYOR(surveyor_id)
+);
+
+CREATE TABLE CARRIES (
+    voyage_id INT,
+    cargo_id INT,
+    PRIMARY KEY (voyage_id, cargo_id),
+    FOREIGN KEY (voyage_id) REFERENCES VOYAGE(voyage_id),
+    FOREIGN KEY (cargo_id) REFERENCES CARGO(cargo_id)
+);

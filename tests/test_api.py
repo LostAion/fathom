@@ -1,0 +1,150 @@
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+def test_health_check():
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "marine_insurance" in data["database"]
+
+def test_client_crud_lifecycle():
+    # 1. Create client
+    create_payload = {
+        "name": "Global Sea Freight Ltd",
+        "address": "12 Ocean Terminal, Hamburg"
+    }
+    create_res = client.post("/api/clients/", json=create_payload)
+    assert create_res.status_code == 201
+    created_client = create_res.json()
+    client_id = created_client["client_id"]
+    assert created_client["name"] == create_payload["name"]
+    assert created_client["address"] == create_payload["address"]
+
+    # 2. Read single client
+    get_res = client.get(f"/api/clients/{client_id}")
+    assert get_res.status_code == 200
+    assert get_res.json()["client_id"] == client_id
+
+    # 3. Read list of clients
+    list_res = client.get("/api/clients/?limit=10")
+    assert list_res.status_code == 200
+    assert any(c["client_id"] == client_id for c in list_res.json())
+
+    # 4. Update client
+    update_payload = {"address": "Updated Terminal 99, Hamburg"}
+    put_res = client.put(f"/api/clients/{client_id}", json=update_payload)
+    assert put_res.status_code == 200
+    assert put_res.json()["address"] == "Updated Terminal 99, Hamburg"
+
+    # 5. Delete client
+    del_res = client.delete(f"/api/clients/{client_id}")
+    assert del_res.status_code == 204
+
+    # 6. Verify 404
+    get_after_del = client.get(f"/api/clients/{client_id}")
+    assert get_after_del.status_code == 404
+
+def test_broker_unique_constraint():
+    unique_licence = "TEST-LIC-UNIQUE-999"
+    payload = {"agency_name": "Test Agency", "licence_no": unique_licence}
+    res1 = client.post("/api/brokers/", json=payload)
+    assert res1.status_code == 201
+    broker_id = res1.json()["broker_id"]
+
+    # Second insert with same licence must fail with 400
+    res2 = client.post("/api/brokers/", json=payload)
+    assert res2.status_code == 400
+    assert "already exists" in res2.json()["detail"]
+
+    # Clean up
+    client.delete(f"/api/brokers/{broker_id}")
+
+def test_policy_and_claim_flow():
+    # Fetch existing client, vessel, underwriter, broker from seed
+    clients = client.get("/api/clients/").json()
+    assert len(clients) > 0
+    c_id = clients[0]["client_id"]
+
+    vessels = client.get("/api/vessels/").json()
+    assert len(vessels) > 0
+    v_id = vessels[0]["vessel_id"]
+
+    # Create a policy
+    policy_payload = {
+        "issue_date": "2026-06-01",
+        "expiry_date": "2027-05-31",
+        "premium": "15000.00",
+        "sum_insured": "1000000.00",
+        "policy_type": "HULL",
+        "vessel_value_covered": "1000000.00",
+        "client_id": c_id,
+        "vessel_id": v_id
+    }
+    p_res = client.post("/api/policies/", json=policy_payload)
+    assert p_res.status_code == 201
+    policy_data = p_res.json()
+    p_no = policy_data["policy_no"]
+    assert policy_data["policy_type"] == "HULL"
+
+    # Create a claim under this policy
+    claim_payload = {
+        "loss_date": "2026-08-15",
+        "claim_amount": "45000.00",
+        "policy_no": p_no
+    }
+    cl_res = client.post("/api/claims/", json=claim_payload)
+    assert cl_res.status_code == 201
+    claim_data = cl_res.json()
+    cl_id = claim_data["claim_id"]
+
+    # Read claim
+    get_claim_res = client.get(f"/api/claims/{cl_id}")
+    assert get_claim_res.status_code == 200
+    assert float(get_claim_res.json()["claim_amount"]) == 45000.00
+
+    # Delete claim and policy
+    assert client.delete(f"/api/claims/{cl_id}").status_code == 204
+    assert client.delete(f"/api/policies/{p_no}").status_code == 204
+
+def test_junction_reinsured_by():
+    # Get existing policy and reinsurer
+    policies = client.get("/api/policies/").json()
+    reinsurers = client.get("/api/reinsurers/").json()
+    assert len(policies) > 0
+    assert len(reinsurers) > 0
+
+    p_no = policies[0]["policy_no"]
+    # Create a temporary reinsurer to avoid conflict with existing seeds
+    new_re = client.post("/api/reinsurers/", json={"name": "Temp Test Reinsurance"}).json()
+    r_id = new_re["reinsurer_id"]
+
+    # Create junction mapping
+    link_res = client.post("/api/reinsured-by/", json={
+        "policy_no": p_no,
+        "reinsurer_id": r_id,
+        "share_percent": "25.50"
+    })
+    assert link_res.status_code == 201
+
+    # Get composite link
+    get_link = client.get(f"/api/reinsured-by/{p_no}/{r_id}")
+    assert get_link.status_code == 200
+    assert float(get_link.json()["share_percent"]) == 25.50
+
+    # Update composite link
+    update_link = client.put(f"/api/reinsured-by/{p_no}/{r_id}", json={
+        "share_percent": "30.00"
+    })
+    assert update_link.status_code == 200
+    assert float(update_link.json()["share_percent"]) == 30.00
+
+    # Delete composite link
+    del_link = client.delete(f"/api/reinsured-by/{p_no}/{r_id}")
+    assert del_link.status_code == 204
+
+    # Clean up temp reinsurer
+    client.delete(f"/api/reinsurers/{r_id}")
