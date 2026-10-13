@@ -19,6 +19,7 @@ from app.routers import (
     reinsured_by,
     assessed_by,
     carries,
+    concurrency,
 )
 
 tags_metadata = [
@@ -94,3 +95,5 @@ app.include_router(claims.router, prefix=api_prefix)
 app.include_router(reinsured_by.router, prefix=api_prefix)
 app.include_router(assessed_by.router, prefix=api_prefix)
 app.include_router(carries.router, prefix=api_prefix)
+app.include_router(concurrency.router, prefix=api_prefix)
+

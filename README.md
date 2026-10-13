@@ -139,6 +139,62 @@ All single-column primary keys are automatically generated using `AUTO_INCREMENT
 
 ---
 
+---
+
+## ⚡ DBMS Concurrency Control Demonstration
+
+To satisfy the DBMS coursework requirement for demonstrating **concurrent transaction execution and ACID properties**, this system includes a live concurrency demonstration modeling **concurrent claims processing against an aggregate policy limit**.
+
+### Scenario:
+A marine policy has an aggregate coverage limit of **$100,000.00**. Two independent adjusters attempt to settle **$60,000.00** claims simultaneously (total = $120,000.00).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor T1 as Thread 1 (Adjuster A)
+    actor T2 as Thread 2 (Adjuster B)
+    participant DB as MariaDB (Engine)
+
+    Note over T1,T2: PART 2: ACID Locking (SELECT ... FOR UPDATE)
+    T1->>DB: BEGIN TX; SELECT ... FOR UPDATE (Policy #1)
+    activate DB
+    Note over DB: Exclusive X-Lock Acquired by T1
+    T2->>DB: BEGIN TX; SELECT ... FOR UPDATE (Policy #1)
+    Note over T2,DB: Thread 2 BLOCKED waiting for Lock
+    T1->>DB: Read remaining: $100k; Pay $60k; COMMIT
+    deactivate DB
+    Note over DB: T1 releases lock. Remaining = $40k
+    activate DB
+    Note over T2,DB: Thread 2 UNBLOCKS; Reads remaining: $40k
+    T2->>DB: $60k > $40k remaining -> ROLLBACK
+    deactivate DB
+    Note over DB: Consistency Maintained! ($60k paid <= $100k limit)
+```
+
+### 1. Run Live Interactive Terminal Demo:
+```bash
+uv run python scripts/demo_concurrency.py
+```
+This runs both scenarios in real time and prints the thread-level lock acquisitions, timeouts, and transaction commits/rollbacks.
+
+### 2. Live API Endpoints:
+- **`POST /api/concurrency/demo-race-condition`**: Demonstrates the anomaly when rows are not locked (over-payment breach of $20,000.00).
+- **`POST /api/concurrency/demo-safe-transaction`**: Demonstrates MariaDB row-level locking (`SELECT ... FOR UPDATE`), serializing concurrent transactions and safely rolling back the exceeding transaction.
+
+---
+
+## 🔄 Policy Lifecycle & Claims Settlement
+
+The API models practical marine insurance workflow states:
+- **Policy Lifecycle**: `DRAFT` ➔ `QUOTED` ➔ `BOUND`
+  - `POST /api/policies/{policy_no}/quote`
+  - `POST /api/policies/{policy_no}/bind`
+- **Claims Settlement**:
+  - `POST /api/claims/{claim_id}/settle`: Automatically computes net payout deducting the policy deductible:
+    $$\text{Payout} = \max\Big(0, \; \min(\text{Claim Amount}, \text{Sum Insured}) - \text{Deductible}\Big)$$
+
+---
+
 ## 🛠️ Database Setup and Maintenance Scripts
 
 If you ever need to reset or re-seed the MariaDB database:
@@ -151,7 +207,12 @@ If you ever need to reset or re-seed the MariaDB database:
    ```bash
    uv run python scripts/seed_data.py
    ```
-3. **Run Automated Test Suite**:
+3. **Run Concurrency Demo**:
+   ```bash
+   uv run python scripts/demo_concurrency.py
+   ```
+4. **Run Automated Test Suite**:
    ```bash
    uv run pytest tests/ -v
    ```
+
