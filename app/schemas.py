@@ -194,6 +194,8 @@ class PolicyBase(BaseModel):
     vessel_value_covered: Optional[Decimal] = None
     cargo_type: Optional[str] = Field(None, max_length=50)
     liability_limit: Optional[Decimal] = None
+    status: Optional[str] = "DRAFT"
+    deductible: Optional[Decimal] = Decimal("10000.00")
     client_id: Optional[int] = None
     broker_id: Optional[int] = None
     emp_id: Optional[int] = None
@@ -212,6 +214,8 @@ class PolicyUpdate(BaseModel):
     vessel_value_covered: Optional[Decimal] = None
     cargo_type: Optional[str] = Field(None, max_length=50)
     liability_limit: Optional[Decimal] = None
+    status: Optional[str] = None
+    deductible: Optional[Decimal] = None
     client_id: Optional[int] = None
     broker_id: Optional[int] = None
     emp_id: Optional[int] = None
@@ -230,6 +234,9 @@ class ClaimBase(BaseModel):
     loss_date: Optional[date] = None
     claim_amount: Optional[Decimal] = None
     policy_no: Optional[int] = None
+    status: Optional[str] = "REPORTED"
+    deductible_applied: Optional[Decimal] = Decimal("0.00")
+    settled_amount: Optional[Decimal] = None
 
 class ClaimCreate(ClaimBase):
     pass
@@ -238,6 +245,9 @@ class ClaimUpdate(BaseModel):
     loss_date: Optional[date] = None
     claim_amount: Optional[Decimal] = None
     policy_no: Optional[int] = None
+    status: Optional[str] = None
+    deductible_applied: Optional[Decimal] = None
+    settled_amount: Optional[Decimal] = None
 
 class ClaimRead(ClaimBase):
     claim_id: int

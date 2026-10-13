@@ -115,6 +115,8 @@ class Policy(Base):
     vessel_value_covered = Column(Numeric(12, 2), nullable=True)
     cargo_type = Column(String(50), nullable=True)
     liability_limit = Column(Numeric(12, 2), nullable=True)
+    status = Column(String(20), default="DRAFT", nullable=False)
+    deductible = Column(Numeric(12, 2), default=10000.00, nullable=False)
 
     client_id = Column(Integer, ForeignKey("CLIENT.client_id"), nullable=True)
     broker_id = Column(Integer, ForeignKey("BROKER.broker_id"), nullable=True)
@@ -138,6 +140,9 @@ class Claim(Base):
     loss_date = Column(Date, nullable=True)
     claim_amount = Column(Numeric(12, 2), nullable=True)
     policy_no = Column(Integer, ForeignKey("POLICY.policy_no"), nullable=True)
+    status = Column(String(20), default="REPORTED", nullable=False)
+    deductible_applied = Column(Numeric(12, 2), default=0.00, nullable=False)
+    settled_amount = Column(Numeric(12, 2), nullable=True)
 
     policy = relationship("Policy", back_populates="claims")
     surveyors = relationship("AssessedBy", back_populates="claim")

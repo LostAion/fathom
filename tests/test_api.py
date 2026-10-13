@@ -73,7 +73,7 @@ def test_policy_and_claim_flow():
     assert len(vessels) > 0
     v_id = vessels[0]["vessel_id"]
 
-    # Create a policy
+    # Create a policy (starts in DRAFT)
     policy_payload = {
         "issue_date": "2026-06-01",
         "expiry_date": "2027-05-31",
@@ -82,13 +82,23 @@ def test_policy_and_claim_flow():
         "policy_type": "HULL",
         "vessel_value_covered": "1000000.00",
         "client_id": c_id,
-        "vessel_id": v_id
+        "vessel_id": v_id,
+        "deductible": "10000.00"
     }
     p_res = client.post("/api/policies/", json=policy_payload)
     assert p_res.status_code == 201
     policy_data = p_res.json()
     p_no = policy_data["policy_no"]
-    assert policy_data["policy_type"] == "HULL"
+    assert policy_data["status"] == "DRAFT"
+
+    # Move policy to QUOTED, then BOUND
+    quote_res = client.post(f"/api/policies/{p_no}/quote")
+    assert quote_res.status_code == 200
+    assert quote_res.json()["status"] == "QUOTED"
+
+    bind_res = client.post(f"/api/policies/{p_no}/bind")
+    assert bind_res.status_code == 200
+    assert bind_res.json()["status"] == "BOUND"
 
     # Create a claim under this policy
     claim_payload = {
@@ -100,11 +110,15 @@ def test_policy_and_claim_flow():
     assert cl_res.status_code == 201
     claim_data = cl_res.json()
     cl_id = claim_data["claim_id"]
+    assert claim_data["status"] == "REPORTED"
 
-    # Read claim
-    get_claim_res = client.get(f"/api/claims/{cl_id}")
-    assert get_claim_res.status_code == 200
-    assert float(get_claim_res.json()["claim_amount"]) == 45000.00
+    # Settle claim: $45,000 claim - $10,000 deductible = $35,000 net payout
+    settle_res = client.post(f"/api/claims/{cl_id}/settle")
+    assert settle_res.status_code == 200
+    settled_data = settle_res.json()
+    assert settled_data["status"] == "SETTLED"
+    assert float(settled_data["settled_amount"]) == 35000.00
+    assert float(settled_data["deductible_applied"]) == 10000.00
 
     # Delete claim and policy
     assert client.delete(f"/api/claims/{cl_id}").status_code == 204
