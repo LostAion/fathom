@@ -29,7 +29,7 @@ class Surveyor(Base):
     name = Column(String(100), nullable=False)
     qualification = Column(String(100), nullable=True)
 
-    assessed_claims = relationship("AssessedBy", back_populates="surveyor")
+    assessed_claims = relationship("AssessedBy", back_populates="surveyor", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Reinsurer(Base):
@@ -38,7 +38,7 @@ class Reinsurer(Base):
     reinsurer_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
 
-    reinsured_policies = relationship("ReinsuredBy", back_populates="reinsurer")
+    reinsured_policies = relationship("ReinsuredBy", back_populates="reinsurer", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Cargo(Base):
@@ -49,7 +49,7 @@ class Cargo(Base):
     value = Column(Numeric(12, 2), nullable=True)
 
     policies = relationship("Policy", back_populates="cargo")
-    voyage_carries = relationship("Carries", back_populates="cargo")
+    voyage_carries = relationship("Carries", back_populates="cargo", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Vessel(Base):
@@ -97,7 +97,7 @@ class Voyage(Base):
     vessel_id = Column(Integer, ForeignKey("VESSEL.vessel_id"), nullable=True)
 
     vessel = relationship("Vessel", back_populates="voyages")
-    carried_cargos = relationship("Carries", back_populates="voyage")
+    carried_cargos = relationship("Carries", back_populates="voyage", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Policy(Base):
@@ -129,8 +129,8 @@ class Policy(Base):
     underwriter = relationship("Underwriter", back_populates="policies")
     vessel = relationship("Vessel", back_populates="policies")
     cargo = relationship("Cargo", back_populates="policies")
-    claims = relationship("Claim", back_populates="policy")
-    reinsurers = relationship("ReinsuredBy", back_populates="policy")
+    claims = relationship("Claim", back_populates="policy", cascade="all, delete-orphan", passive_deletes=True)
+    reinsurers = relationship("ReinsuredBy", back_populates="policy", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Claim(Base):
@@ -145,7 +145,7 @@ class Claim(Base):
     settled_amount = Column(Numeric(12, 2), nullable=True)
 
     policy = relationship("Policy", back_populates="claims")
-    surveyors = relationship("AssessedBy", back_populates="claim")
+    surveyors = relationship("AssessedBy", back_populates="claim", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class ReinsuredBy(Base):
