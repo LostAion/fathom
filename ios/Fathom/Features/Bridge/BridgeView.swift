@@ -34,6 +34,9 @@ struct BridgeView: View {
                     ExpiringSoon(counts: metrics.expiring)
                     VoyageStrip()
                     AttentionList(items: metrics.attention)
+                }
+                if ledger.hasLoaded {
+                    // The lab makes its own demo rows, so it works on an empty database too.
                     NavigationLink(value: Route.lab) { LabLink() }
                         .buttonStyle(.plain)
                 }
