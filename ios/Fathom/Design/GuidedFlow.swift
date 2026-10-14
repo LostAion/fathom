@@ -128,6 +128,7 @@ struct GuidedFlow<Content: View>: View {
                         if busy { ProgressView() }
                         Text(isLast ? finishLabel : "Next")
                     }
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)

@@ -16,7 +16,11 @@ enum Theme {
     static let coral = Color(light: 0xD9483B, dark: 0xFF6B6B)
 
     /// Extra hues for telling entity kinds apart; they carry no status meaning.
-    static let sky = Color(light: 0x2F6FA8, dark: 0x5DA9E9)
+    /// sky, kelp and rose are the policy-type series (hull, cargo, P&I). They were checked with a
+    /// colour-blindness validator against both chart surfaces, so keep them together and in this order.
+    static let sky = Color(light: 0x2F6FA8, dark: 0x4F9BDB)
+    static let kelp = Color(light: 0x5C8A2E, dark: 0x74A346)
+    static let rose = Color(light: 0xA8457F, dark: 0xC7609F)
     static let lavender = Color(light: 0x5B4BC4, dark: 0x9B8CFF)
 }
 
@@ -28,13 +32,15 @@ extension Font {
 
 extension Color {
     init(light: UInt32, dark: UInt32) {
-        self.init(uiColor: UIColor { traits in
+        // @Sendable so the provider isn't main-actor isolated: MapKit resolves
+        // overlay colours on a background thread.
+        self.init(uiColor: UIColor { @Sendable traits in
             UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
         })
     }
 }
 
-private extension UIColor {
+nonisolated private extension UIColor {
     convenience init(hex: UInt32) {
         self.init(
             red: CGFloat((hex >> 16) & 0xFF) / 255,

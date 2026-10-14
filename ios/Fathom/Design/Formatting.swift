@@ -16,7 +16,7 @@ extension String {
 }
 
 /// "1 policy", "3 policies", "1 treaty share", "2 treaty shares".
-func counted(_ count: Int, _ singular: String, _ plural: String? = nil) -> String {
+nonisolated func counted(_ count: Int, _ singular: String, _ plural: String? = nil) -> String {
     "\(count) \(count == 1 ? singular : plural ?? singular + "s")"
 }
 

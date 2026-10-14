@@ -1,8 +1,11 @@
 import SwiftUI
 
 /// Slowly drifting depth contours with a sonar ping, drawn behind every screen.
+/// An extra ping runs from the top each time the ledger finishes a reload.
 struct SonarBackground: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(Ledger.self) private var ledger: Ledger?
+    @State private var refreshPing: Date?
 
     private let rings = 14
     private let pingPeriod = 6.0
@@ -32,7 +35,18 @@ struct SonarBackground: View {
                 let r = phase * maxRadius
                 let ping = Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: 2 * r, height: 2 * r))
                 context.stroke(ping, with: .color(Theme.teal.opacity(0.3 * (1 - phase))), lineWidth: 2)
+
+                if let start = refreshPing?.timeIntervalSinceReferenceDate, t - start < 1.6 {
+                    let age = (t - start) / 1.6
+                    let origin = CGPoint(x: size.width / 2, y: 0)
+                    let r = age * maxRadius * 0.8
+                    let sweep = Path(ellipseIn: CGRect(x: origin.x - r, y: origin.y - r, width: 2 * r, height: 2 * r))
+                    context.stroke(sweep, with: .color(Theme.teal.opacity(0.5 * (1 - age))), lineWidth: 3)
+                }
             }
+        }
+        .onChange(of: ledger?.refreshes) {
+            if !reduceMotion { refreshPing = .now }
         }
         .background(Theme.abyss)
         .ignoresSafeArea()

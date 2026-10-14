@@ -14,6 +14,8 @@ final class Ledger {
     private(set) var isLoading = false
     private(set) var hasLoaded = false
     private(set) var loadError: String?
+    /// Counts finished reloads; the sonar background pings on each one.
+    private(set) var refreshes = 0
 
     func all<T: APIModel>(_ type: T.Type) -> [T] {
         rows[T.collection] as? [T] ?? []
@@ -43,6 +45,7 @@ final class Ledger {
             }
             hasLoaded = true
             loadError = nil
+            refreshes += 1
         } catch {
             loadError = error.localizedDescription
         }

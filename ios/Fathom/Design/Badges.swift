@@ -81,7 +81,7 @@ struct LedgerStatusCard: View {
         } else if !ledger.hasLoaded {
             GlassCard {
                 HStack(spacing: 12) {
-                    ProgressView()
+                    DepthGauge()
                     Text("Sounding the records…")
                         .foregroundStyle(Theme.inkMuted)
                 }
