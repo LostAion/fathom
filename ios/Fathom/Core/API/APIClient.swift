@@ -65,6 +65,15 @@ final class APIClient {
         try await send("POST", path)
     }
 
+    func assessPolicy(_ policyNo: Int, vesselAge: Int, voyageId: Int?) async throws -> Policy {
+        struct Assessment: Encodable {
+            var vesselAge: Int
+            var voyageId: Int?
+        }
+        return try await send("POST", "policies/\(policyNo)/submit-underwriting",
+                              body: Assessment(vesselAge: vesselAge, voyageId: voyageId))
+    }
+
     func health() async throws -> Health {
         try await send("GET", "health")
     }

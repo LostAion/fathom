@@ -1,7 +1,18 @@
 from datetime import date
 from decimal import Decimal
-from typing import Optional, Literal
+from typing import Optional, Literal, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: list[T]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
 
 # ==========================================
 # CLIENT
@@ -223,6 +234,12 @@ class PolicyUpdate(BaseModel):
     cargo_id: Optional[int] = None
 
 class PolicyRead(PolicyBase):
+    underwriting_report: Optional[dict] = None
+    underwriting_decision: Optional[str] = None
+    risk_score: Optional[int] = None
+    warranties: Optional[str] = None
+    awrp_surcharge: Decimal = Decimal("0.00")
+    is_active: bool = True
     policy_no: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -231,6 +248,7 @@ class PolicyRead(PolicyBase):
 # CLAIM
 # ==========================================
 class ClaimBase(BaseModel):
+    reserve_amount: Optional[Decimal] = Field(None, ge=0)
     loss_date: Optional[date] = None
     claim_amount: Optional[Decimal] = None
     policy_no: Optional[int] = None
@@ -242,6 +260,7 @@ class ClaimCreate(ClaimBase):
     pass
 
 class ClaimUpdate(BaseModel):
+    reserve_amount: Optional[Decimal] = Field(None, ge=0)
     loss_date: Optional[date] = None
     claim_amount: Optional[Decimal] = None
     policy_no: Optional[int] = None
@@ -250,6 +269,7 @@ class ClaimUpdate(BaseModel):
     settled_amount: Optional[Decimal] = None
 
 class ClaimRead(ClaimBase):
+    is_active: bool = True
     claim_id: int
     model_config = ConfigDict(from_attributes=True)
 

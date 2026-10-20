@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
+from sqlalchemy.exc import IntegrityError
 from app.config import settings
 
 # Import routers
@@ -21,6 +22,7 @@ from app.routers import (
     carries,
     concurrency,
     sea_routes,
+    underwriting,
 )
 
 tags_metadata = [
@@ -100,3 +102,10 @@ app.include_router(carries.router, prefix=api_prefix)
 app.include_router(concurrency.router, prefix=api_prefix)
 app.include_router(sea_routes.router, prefix=api_prefix)
 
+
+app.include_router(underwriting.router, prefix=api_prefix)
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error(request: Request, exc: IntegrityError):
+    return JSONResponse(status_code=400, content={"detail": "The change violates a database constraint."})

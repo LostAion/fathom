@@ -7,12 +7,19 @@ struct PolicyEditor: View {
 
     var body: some View {
         let type = policy.policyType ?? .hull
+        let bound = policy.stage == .bound || policy.stage == .active
         EditSheet(title: "Policy", symbol: type.symbol, tint: type.tint, isNew: false, item: policy,
                   isValid: Self.isValid) { $item in
+            if bound {
+                Text("Coverage inputs are locked after binding. Brokers, underwriters and dates can still be updated.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.inkMuted)
+            }
             Picker("Client", selection: $item.clientId) {
                 Text("None").tag(Int?.none)
                 ForEach(ledger.clients) { Text($0.name).tag(Optional($0.id)) }
             }
+            .disabled(bound)
             Picker("Broker", selection: $item.brokerId) {
                 Text("None").tag(Int?.none)
                 ForEach(ledger.brokers) { Text($0.agencyName).tag(Optional($0.id)) }
@@ -26,12 +33,15 @@ struct PolicyEditor: View {
                     Text("None").tag(Int?.none)
                     ForEach(ledger.cargos) { Text($0.description ?? "Cargo #\($0.id)").tag(Optional($0.id)) }
                 }
+                .disabled(bound)
                 TextField("Cargo type", text: $item.cargoType.orEmpty)
+                    .disabled(bound)
             } else {
                 Picker("Vessel", selection: $item.vesselId) {
                     Text("None").tag(Int?.none)
                     ForEach(ledger.vessels) { Text($0.name).tag(Optional($0.id)) }
                 }
+                .disabled(bound)
             }
             Group {
                 DatePicker("Cover starts", selection: $item.issueDate.apiDate, displayedComponents: .date)
@@ -39,8 +49,11 @@ struct PolicyEditor: View {
             }
             .environment(\.timeZone, .gmt)
             MoneyField(title: "Sum insured", text: $item.sumInsured.orEmpty)
+                .disabled(bound)
             MoneyField(title: "Premium", text: $item.premium.orEmpty)
+                .disabled(bound)
             MoneyField(title: "Deductible", text: $item.deductible.orEmpty)
+                .disabled(bound)
             if type == .hull {
                 MoneyField(title: "Vessel value covered", text: $item.vesselValueCovered.orEmpty)
             } else if type == .pi {

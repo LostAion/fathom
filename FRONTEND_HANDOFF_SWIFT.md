@@ -754,3 +754,22 @@ The database comes pre-seeded with test data so you can test views right away:
 | | `GET/DEL`| `/api/assessed-by/{claim_id}/{surveyor_id}` | Get / Delete assessment link | `200`, `204`, `404` |
 | **Carries** | `GET/POST`| `/api/carries/` | List / Link cargo to voyage | `200`, `201`, `400` |
 | | `GET/DEL`| `/api/carries/{voyage_id}/{cargo_id}` | Get / Delete voyage-cargo link | `200`, `204`, `404` |
+
+
+## Underwriting additions
+
+Policy responses now include optional `underwriting_decision`, `risk_score`,
+`warranties`, `awrp_surcharge` (a decimal string), and `underwriting_report`.
+The report includes `vessel_age`, `voyage_id`, `risk_factors`,
+`warranties_required`, `retrieved_guidelines`, and `recommended_premium`.
+These fields are server-owned and cannot be set through policy create/update.
+
+`APIClient.assessPolicy(_:vesselAge:voyageId:)` posts to
+`policies/{policy_no}/submit-underwriting` and returns the updated policy.
+The policy detail screen saves that response in the Ledger and disables Bind
+for `DECLINE` and `REFER_TO_SENIOR`. The backend enforces both decisions too.
+
+List endpoints still return arrays unless the caller explicitly passes `page`.
+The existing client needs no pagination response changes. Default DELETE behavior
+and database cascades are unchanged. See the README for optional archiving and
+the limits of the local underwriting demo.

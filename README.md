@@ -201,7 +201,7 @@ The API models practical marine insurance workflow states:
   - `POST /api/policies/{policy_no}/bind`
 - **Claims Settlement**:
   - `POST /api/claims/{claim_id}/settle`: Automatically computes net payout deducting the policy deductible:
-    $$\text{Payout} = \max\Big(0, \; \min(\text{Claim Amount}, \text{Sum Insured}) - \text{Deductible}\Big)$$
+    $$\text{Payout} = \min(\max(0, \text{Claim Amount} - \text{Deductible}), \max(0, \text{Sum Insured} - \text{Prior Payouts}))$$
 
 ---
 
@@ -226,3 +226,79 @@ If you ever need to reset or re-seed the MariaDB database:
    uv run pytest tests/ -v
    ```
 
+
+
+## Underwriting demo
+
+Fathom can assess a draft policy using local rules, claims history, and keyword
+retrieval over the bundled guidelines. The sanctions entries are synthetic
+coursework fixtures. Route checks use port names and fixed geographic areas,
+not a live AIS feed. These inputs do not establish real sanctions clearance.
+
+For an existing database, run the additive migration before starting this version:
+
+```bash
+uv sync --extra dev
+uv run python scripts/migrate_v2.py
+```
+
+New databases created with `scripts/init_db.py` already contain the new columns.
+The migration can be run again without resetting records.
+
+In the iOS app, open a draft or quoted policy, scroll to **Underwriting**, and tap
+**Assess risk**. Enter the vessel age and select a voyage belonging to that vessel.
+The database does not store vessel age, so the form starts at 10 years and shows
+the age used in the saved report. Choosing no voyage skips route assessment.
+
+The assessment saves a risk score, decision, conditions, surcharge, and supporting
+guideline excerpts. It fills the premium only when the policy has no premium.
+Decisions are `APPROVE`, `APPROVE_WITH_CONDITIONS`, `REFER_TO_SENIOR`, or `DECLINE`.
+Declined and referred policies cannot be bound. Senior review remains a manual
+process outside this demo; it has no approval override endpoint.
+
+The existing Quote and Bind workflow still works without an assessment. Binding
+always screens the linked client and vessel against the fixtures, including when
+coverage is created directly as BOUND or ACTIVE. Assessed policies also recheck
+risk at binding time. Changing assessment inputs on a draft clears its old report.
+Bound coverage rejects changes to those inputs.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/underwriting/assess` | Preview risk without saving a policy |
+| `GET /api/underwriting/sanctions-check` | Check the local sanctions fixtures |
+| `POST /api/underwriting/evaluate-engine` | Run four synthetic benchmark cases |
+| `POST /api/policies/{policy_no}/submit-underwriting` | Assess and save a policy report |
+
+Example submission body:
+
+```json
+{"vessel_age": 12, "voyage_id": 1}
+```
+
+The preview endpoint also requires `policy_type` and positive `sum_insured`.
+Supplied entity IDs must exist; a selected voyage must belong to the selected
+vessel. Database identities take precedence over supplied names.
+
+Policy and claim list endpoints keep returning arrays with `X-Total-Count` for
+existing clients. Passing `page=1&limit=50` opts into an object containing `items`,
+`total`, `page`, `limit`, and `total_pages`. Normal DELETE calls still permanently
+remove records and apply database cascades. Pass `permanent=false` to archive a
+policy or claim instead, and use `is_active` to filter lists. Archiving a policy
+cancels it and blocks further settlements without deleting its claims.
+
+Run backend tests against a separate seeded database:
+
+```bash
+DB_NAME=marine_insurance_underwriting_test uv run python scripts/init_db.py
+DB_NAME=marine_insurance_underwriting_test uv run python scripts/seed_data.py
+DB_NAME=marine_insurance_underwriting_test uv run pytest tests/ -q
+```
+
+Generate the iOS project with `xcodegen generate --spec ios/project.yml`.
+`FathomTests` covers report decoding and binding decisions.
+`UnderwritingUITests` needs the API running at `http://127.0.0.1:8000` and exercises
+assessment, voyage selection, saved results, binding, and a declined policy.
+
+See the [short demo](docs/underwriting/demo.mp4) and screenshots of an
+[assessment](docs/underwriting/assessment.png) and a
+[declined policy](docs/underwriting/declined.png).

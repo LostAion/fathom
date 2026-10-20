@@ -26,6 +26,7 @@ struct PolicyDetailView: View {
                     hero(links)
                     coverage(policy)
                     lifecycle(policy)
+                    UnderwritingCard(policy: policy)
                     financials(policy)
                     relationships(links)
                     reinsurance(links)
@@ -188,6 +189,7 @@ struct PolicyDetailView: View {
                         }
                         if policy.stage == .quoted {
                             actionButton("Bind", symbol: "seal.fill", tint: Theme.teal) { await advance("bind") }
+                                .disabled(policy.underwritingBlocksBinding)
                         }
                         Button("Cancel policy", role: .destructive) { confirmingCancel = true }
                             .buttonStyle(.glass)

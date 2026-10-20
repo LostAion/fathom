@@ -146,7 +146,16 @@ nonisolated struct Policy: APIModel {
     var empId: Int?
     var vesselId: Int?
     var cargoId: Int?
+    var underwritingDecision: String?
+    var riskScore: Int?
+    var warranties: String?
+    var awrpSurcharge: String?
+    var underwritingReport: UnderwritingReport?
     var id: Int { policyNo }
+
+    var underwritingBlocksBinding: Bool {
+        underwritingDecision == "DECLINE" || underwritingDecision == "REFER_TO_SENIOR"
+    }
 
     var premiumAmount: Decimal? { Decimal(apiString: premium) }
     var sumInsuredAmount: Decimal? { Decimal(apiString: sumInsured) }
@@ -224,4 +233,19 @@ nonisolated enum APIDate {
 
     static func parse(_ string: String?) -> Date? { string.flatMap { try? Date($0, strategy: style) } }
     static func string(_ date: Date) -> String { date.formatted(style) }
+}
+
+
+nonisolated struct UnderwritingReport: Codable, Hashable {
+    struct Guideline: Codable, Hashable {
+        var title: String
+        var excerpt: String
+    }
+
+    var vesselAge: Int
+    var voyageId: Int?
+    var riskFactors: [String]
+    var warrantiesRequired: [String]
+    var retrievedGuidelines: [Guideline]
+    var recommendedPremium: Double
 }

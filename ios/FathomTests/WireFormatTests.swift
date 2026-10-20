@@ -37,3 +37,28 @@ struct WireFormatTests {
         #expect(Vessel(vesselId: 7, name: "x", imoNumber: "1").resourcePath == "vessels/7")
     }
 }
+
+struct UnderwritingWireTests {
+    @Test func assessmentReportSurvivesPolicyDecoding() throws {
+        let data = Data("""
+        {"policy_no":9,"status":"QUOTED","underwriting_decision":"DECLINE","risk_score":100,
+         "awrp_surcharge":"0.00","underwriting_report":{"vessel_age":12,"voyage_id":3,
+         "risk_factors":["Fixture match"],"warranties_required":["Do not bind"],
+         "retrieved_guidelines":[],"recommended_premium":0.0}}
+        """.utf8)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let policy = try decoder.decode(Policy.self, from: data)
+        #expect(policy.underwritingBlocksBinding)
+        #expect(policy.riskScore == 100)
+        #expect(policy.underwritingReport?.vesselAge == 12)
+        #expect(policy.underwritingReport?.voyageId == 3)
+        #expect(policy.underwritingReport?.riskFactors == ["Fixture match"])
+    }
+
+    @Test(arguments: ["APPROVE", "APPROVE_WITH_CONDITIONS", "REFER_TO_SENIOR", "DECLINE"])
+    func decisionControlsBinding(_ decision: String) {
+        let policy = Policy(policyNo: 1, underwritingDecision: decision)
+        #expect(policy.underwritingBlocksBinding == ["DECLINE", "REFER_TO_SENIOR"].contains(decision))
+    }
+}

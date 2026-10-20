@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, CheckConstraint, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -118,6 +118,13 @@ class Policy(Base):
     status = Column(String(20), default="DRAFT", nullable=False)
     deductible = Column(Numeric(12, 2), default=10000.00, nullable=False)
 
+    underwriting_report = Column(JSON, nullable=True)
+    underwriting_decision = Column(String(30), nullable=True)
+    risk_score = Column(Integer, nullable=True)
+    warranties = Column(Text, nullable=True)
+    awrp_surcharge = Column(Numeric(5, 2), default=0.00, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
     client_id = Column(Integer, ForeignKey("CLIENT.client_id"), nullable=True)
     broker_id = Column(Integer, ForeignKey("BROKER.broker_id"), nullable=True)
     emp_id = Column(Integer, ForeignKey("UNDERWRITER.emp_id"), nullable=True)
@@ -143,6 +150,8 @@ class Claim(Base):
     status = Column(String(20), default="REPORTED", nullable=False)
     deductible_applied = Column(Numeric(12, 2), default=0.00, nullable=False)
     settled_amount = Column(Numeric(12, 2), nullable=True)
+    reserve_amount = Column(Numeric(12, 2), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
 
     policy = relationship("Policy", back_populates="claims")
     surveyors = relationship("AssessedBy", back_populates="claim", cascade="all, delete-orphan", passive_deletes=True)

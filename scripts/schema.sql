@@ -74,6 +74,12 @@ CREATE TABLE IF NOT EXISTS POLICY (
     liability_limit DECIMAL(12, 2),
     status VARCHAR(20) DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'QUOTED', 'BOUND', 'ACTIVE', 'CANCELLED')),
     deductible DECIMAL(12, 2) DEFAULT 10000.00,
+    underwriting_report JSON,
+    underwriting_decision VARCHAR(30),
+    risk_score INT,
+    warranties TEXT,
+    awrp_surcharge DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     client_id INT,
     broker_id INT,
     emp_id INT,
@@ -93,6 +99,8 @@ CREATE TABLE IF NOT EXISTS CLAIM (
     status VARCHAR(20) DEFAULT 'REPORTED' CHECK (status IN ('REPORTED', 'UNDER_SURVEY', 'APPROVED', 'SETTLED', 'REJECTED')),
     deductible_applied DECIMAL(12, 2) DEFAULT 0.00,
     settled_amount DECIMAL(12, 2),
+    reserve_amount DECIMAL(12, 2),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     policy_no INT,
     FOREIGN KEY (policy_no) REFERENCES POLICY(policy_no) ON DELETE CASCADE
 );
