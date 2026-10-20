@@ -1,13 +1,13 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas_underwriting import UnderwriteAssessRequest, SanctionsCheckRequest
+from app.schemas_underwriting import UnderwriteAssessRequest
 from services.sanctions import sanctions_screener
 from services.underwriting_engine import underwriting_engine
 from evaluation.rubric_eval import evaluator
 
-router = APIRouter(prefix="/underwriting", tags=["Automated Underwriting & RAG"])
+router = APIRouter(prefix="/underwriting", tags=["Underwriting Demo"])
 
 @router.post("/assess", summary="Assess Policy Risk and Generate Decision")
 def assess_policy_risk(
@@ -16,10 +16,10 @@ def assess_policy_risk(
 ):
     """
     Automated Marine Underwriting Assessment:
-    - Runs OFAC SDN sanctions screening
-    - Checks voyage AIS / JWC high-risk corridors
+    - Screens local synthetic sanctions fixtures
+    - Checks fixed voyage risk corridors (no live AIS feed)
     - Evaluates portfolio loss ratio & vessel claims
-    - Retrieves RAG clauses from underwriting guidelines
+    - Retrieves local guideline excerpts using BM25
     - Computes recommended rate & warranties
     """
     return underwriting_engine.evaluate_risk(
@@ -27,13 +27,13 @@ def assess_policy_risk(
         **payload.model_dump()
     )
 
-@router.get("/sanctions-check", summary="Direct OFAC SDN Compliance Screening")
+@router.get("/sanctions-check", summary="Check Local Sanctions Fixtures")
 def check_sanctions(
     imo_number: Optional[str] = Query(None, description="Vessel IMO Number"),
     vessel_name: Optional[str] = Query(None, description="Vessel Name"),
     client_name: Optional[str] = Query(None, description="Client / Owner Name")
 ):
-    """Fast compliance check against OFAC SDN maritime sanctioned vessels & entities."""
+    """Check synthetic coursework sanctions fixtures, not a live sanctions list."""
     return sanctions_screener.screen(
         imo_number=imo_number,
         vessel_name=vessel_name,

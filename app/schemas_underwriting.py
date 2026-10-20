@@ -1,22 +1,22 @@
-from typing import Optional, List, Dict, Any
+from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
-class UnderwriteAssessRequest(BaseModel):
-    policy_type: str = Field(..., description="'HULL', 'CARGO', or 'PI'")
-    sum_insured: float = Field(..., gt=0)
-    premium: Optional[float] = None
-    client_id: Optional[int] = None
-    vessel_id: Optional[int] = None
-    voyage_id: Optional[int] = None
-    cargo_id: Optional[int] = None
-    vessel_age: Optional[int] = 10
-    imo_number: Optional[str] = None
-    vessel_name: Optional[str] = None
-    client_name: Optional[str] = None
-    origin_port: Optional[str] = None
-    dest_port: Optional[str] = None
 
-class SanctionsCheckRequest(BaseModel):
-    imo_number: Optional[str] = None
-    vessel_name: Optional[str] = None
-    client_name: Optional[str] = None
+class PolicyAssessRequest(BaseModel):
+    # Age is supplied for the demo because the vessel table has no build year.
+    vessel_age: int = Field(10, ge=0, le=100)
+    voyage_id: Optional[int] = Field(None, gt=0)
+
+
+class UnderwriteAssessRequest(PolicyAssessRequest):
+    policy_type: Literal["HULL", "CARGO", "PI"]
+    sum_insured: float = Field(..., gt=0, allow_inf_nan=False)
+    premium: Optional[float] = Field(None, ge=0, allow_inf_nan=False)
+    client_id: Optional[int] = Field(None, gt=0)
+    vessel_id: Optional[int] = Field(None, gt=0)
+    cargo_id: Optional[int] = Field(None, gt=0)
+    imo_number: Optional[str] = Field(None, max_length=20)
+    vessel_name: Optional[str] = Field(None, max_length=100)
+    client_name: Optional[str] = Field(None, max_length=100)
+    origin_port: Optional[str] = Field(None, max_length=100)
+    dest_port: Optional[str] = Field(None, max_length=100)

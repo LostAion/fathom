@@ -1,6 +1,6 @@
 {
   "updated_at": "2026-10-13",
-  "description": "OFAC SDN Maritime Sanctioned Entities and Vessels for Compliance Screening",
+  "description": "Synthetic coursework sanctions fixtures. Names and identifiers are not verified sanctions data.",
   "sanctioned_vessels": [
     {
       "imo_number": "IMO8912345",

@@ -42,7 +42,7 @@ JWC_AREAS = [
 
 class AISTracker:
     """
-    Assesses vessel voyage paths and coordinates against maritime risk zones (JWC).
+    Demonstrates route risk using fixed zones and port-name rules. No live AIS feed.
     """
 
     def assess_voyage_route(self, origin_port: str = None, dest_port: str = None, waypoints: List[Dict[str, float]] = None) -> Dict[str, Any]:

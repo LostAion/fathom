@@ -32,23 +32,22 @@ class UnderwritingDecisionEngine:
         dest_port: str = None
     ) -> Dict[str, Any]:
 
-        # 1. Fetch DB entities if IDs provided
-        if client_id and not client_name:
-            c = db.query(Client).filter(Client.client_id == client_id).first()
-            if c:
-                client_name = c.name
+        # Database identities take precedence over user-supplied display names.
+        from fastapi import HTTPException
 
-        if vessel_id:
-            v = db.query(Vessel).filter(Vessel.vessel_id == vessel_id).first()
-            if v:
-                imo_number = imo_number or v.imo_number
-                vessel_name = vessel_name or v.name
-
-        if voyage_id:
-            voy = db.query(Voyage).filter(Voyage.voyage_id == voyage_id).first()
-            if voy:
-                origin_port = origin_port or voy.origin_port
-                dest_port = dest_port or voy.dest_port
+        for model, key in ((Client, client_id), (Vessel, vessel_id), (Voyage, voyage_id), (Cargo, cargo_id)):
+            if key is not None and db.get(model, key) is None:
+                raise HTTPException(status_code=400, detail=f"{model.__name__} {key} does not exist")
+        if client_id is not None:
+            client_name = db.get(Client, client_id).name
+        if vessel_id is not None:
+            vessel = db.get(Vessel, vessel_id)
+            imo_number, vessel_name = vessel.imo_number, vessel.name
+        if voyage_id is not None:
+            voyage = db.get(Voyage, voyage_id)
+            if vessel_id is not None and voyage.vessel_id != vessel_id:
+                raise HTTPException(status_code=400, detail="Voyage must belong to the selected vessel")
+            origin_port, dest_port = voyage.origin_port, voyage.dest_port
 
         # 2. Compliance / Sanctions Check (Hard Guardrail)
         sanctions_res = sanctions_screener.screen(
@@ -63,11 +62,12 @@ class UnderwritingDecisionEngine:
                 "risk_score": 100,
                 "sanctions_cleared": False,
                 "sanctions_matches": sanctions_res["matches"],
-                "risk_factors": ["CRITICAL: Target is listed on OFAC SDN Sanctions List."],
-                "recommended_premium_rate": 0.0,
-                "warranties_required": ["None - Policy Prohibited by International Sanctions (LMA3100)."],
+                "risk_factors": ["Target matches the local demonstration sanctions list."],
+                "base_rate_percent": 0.0,
+                "recommended_premium": 0.0,
+                "warranties_required": ["Binding blocked by the demonstration sanctions rule."],
                 "retrieved_guidelines": [],
-                "summary": "Application strictly declined due to affirmative OFAC sanctions match."
+                "summary": "Application declined due to a match in the local demonstration sanctions list."
             }
 
         # 3. AIS & Navigational Corridor Check
@@ -82,13 +82,15 @@ class UnderwritingDecisionEngine:
         guideline_matches = []
         try:
             guideline_matches = vector_store.retrieve_guidelines(rag_query, n_results=3)
-        except Exception:
-            # Fallback if vector store still compiling
+        except OSError:
+            # Missing local guideline files do not change the deterministic decision.
             pass
 
         # 6. Deterministic Risk Scoring & Premium Loading Calculation
         risk_score = 20 # baseline low risk
         risk_factors: List[str] = []
+        if not origin_port or not dest_port:
+            risk_factors.append("Voyage not supplied; route hazards were not assessed.")
         warranties: List[str] = ["Standard Institute Clauses apply."]
         base_rate_percent = 0.50 # 0.50% base rate
 

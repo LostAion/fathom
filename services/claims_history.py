@@ -15,20 +15,28 @@ class ClaimsHistoryService:
 
         # Total premium paid by client across all past policies
         premium_sum = db.query(func.coalesce(func.sum(Policy.premium), 0)).filter(
-            Policy.client_id == client_id
+            Policy.client_id == client_id,
+            Policy.status.in_(["BOUND", "ACTIVE", "CANCELLED"])
         ).scalar() or Decimal(0)
 
         # Total claims incurred under all policies of this client
-        claims_sum = db.query(func.coalesce(func.sum(Claim.claim_amount), 0)).join(
+        from sqlalchemy import case
+
+        incurred = case((Claim.status == "SETTLED", Claim.settled_amount), else_=Claim.claim_amount)
+        claims_sum = db.query(func.coalesce(func.sum(incurred), 0)).join(
             Policy, Policy.policy_no == Claim.policy_no
         ).filter(
-            Policy.client_id == client_id
+            Policy.client_id == client_id,
+            Policy.status.in_(["BOUND", "ACTIVE", "CANCELLED"]),
+            Claim.status != "REJECTED"
         ).scalar() or Decimal(0)
 
         claims_count = db.query(func.count(Claim.claim_id)).join(
             Policy, Policy.policy_no == Claim.policy_no
         ).filter(
-            Policy.client_id == client_id
+            Policy.client_id == client_id,
+            Policy.status.in_(["BOUND", "ACTIVE", "CANCELLED"]),
+            Claim.status != "REJECTED"
         ).scalar() or 0
 
         p_float = float(premium_sum)
@@ -64,7 +72,8 @@ class ClaimsHistoryService:
         claims = db.query(Claim).join(
             Policy, Policy.policy_no == Claim.policy_no
         ).filter(
-            Policy.vessel_id == vessel_id
+            Policy.vessel_id == vessel_id,
+            Claim.status != "REJECTED"
         ).all()
 
         total_damage = sum(float(c.claim_amount or 0) for c in claims)

@@ -19,12 +19,12 @@ class SanctionsScreener:
         matches: List[Dict[str, Any]] = []
 
         # 1. Match IMO Number (exact canonical check)
-        clean_imo = (imo_number or "").strip().upper()
+        clean_imo = (imo_number or "").strip().upper().removeprefix("IMO").strip()
         clean_vessel = (vessel_name or "").strip().upper()
         clean_client = (client_name or "").strip().upper()
 
         for vessel in self.data.get("sanctioned_vessels", []):
-            sdn_imo = vessel.get("imo_number", "").strip().upper()
+            sdn_imo = vessel.get("imo_number", "").strip().upper().removeprefix("IMO").strip()
             sdn_name = vessel.get("vessel_name", "").strip().upper()
 
             if clean_imo and sdn_imo and clean_imo == sdn_imo:
@@ -59,6 +59,7 @@ class SanctionsScreener:
         is_sanctioned = len(matches) > 0
         return {
             "is_sanctioned": is_sanctioned,
+            "data_source": "Local synthetic coursework fixtures, not a live sanctions list",
             "status": "BLOCKED" if is_sanctioned else "CLEARED",
             "matches_count": len(matches),
             "matches": matches,

@@ -20,6 +20,8 @@ from app.routers import (
     reinsured_by,
     assessed_by,
     carries,
+    concurrency,
+    sea_routes,
     underwriting,
 )
 
@@ -38,6 +40,7 @@ tags_metadata = [
     {"name": "Reinsured By (Junction)", "description": "Mappings of policies to reinsurers and share percentages."},
     {"name": "Assessed By (Junction)", "description": "Mappings of claims to assessing surveyors."},
     {"name": "Carries (Junction)", "description": "Mappings of voyages carrying cargo shipments."},
+    {"name": "Sea Routes", "description": "Shipping-lane distances and paths between ports."},
 ]
 
 app = FastAPI(
@@ -65,16 +68,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Global Database IntegrityError Handler
-@app.exception_handler(IntegrityError)
-async def integrity_error_exception_handler(request: Request, exc: IntegrityError):
-    orig = getattr(exc, "orig", None)
-    error_detail = str(orig) if orig else str(exc)
-    return JSONResponse(
-        status_code=400,
-        content={"detail": f"Database integrity error: {error_detail}"}
-    )
 
 # Root endpoint redirects to Swagger Docs
 @app.get("/", include_in_schema=False)
@@ -106,5 +99,13 @@ app.include_router(claims.router, prefix=api_prefix)
 app.include_router(reinsured_by.router, prefix=api_prefix)
 app.include_router(assessed_by.router, prefix=api_prefix)
 app.include_router(carries.router, prefix=api_prefix)
+app.include_router(concurrency.router, prefix=api_prefix)
+app.include_router(sea_routes.router, prefix=api_prefix)
+
+
 app.include_router(underwriting.router, prefix=api_prefix)
 
+
+@app.exception_handler(IntegrityError)
+async def integrity_error(request: Request, exc: IntegrityError):
+    return JSONResponse(status_code=400, content={"detail": "The change violates a database constraint."})

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, CheckConstraint, Boolean, Text
+from sqlalchemy import Column, Integer, String, Numeric, Date, ForeignKey, CheckConstraint, Text, Boolean, JSON
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -8,7 +8,6 @@ class Client(Base):
     client_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
     address = Column(String(255), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
 
     policies = relationship("Policy", back_populates="client")
 
@@ -19,7 +18,6 @@ class Broker(Base):
     broker_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     agency_name = Column(String(100), nullable=False)
     licence_no = Column(String(50), unique=True, nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
 
     policies = relationship("Policy", back_populates="broker")
 
@@ -31,7 +29,7 @@ class Surveyor(Base):
     name = Column(String(100), nullable=False)
     qualification = Column(String(100), nullable=True)
 
-    assessed_claims = relationship("AssessedBy", back_populates="surveyor")
+    assessed_claims = relationship("AssessedBy", back_populates="surveyor", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Reinsurer(Base):
@@ -40,7 +38,7 @@ class Reinsurer(Base):
     reinsurer_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     name = Column(String(100), nullable=False)
 
-    reinsured_policies = relationship("ReinsuredBy", back_populates="reinsurer")
+    reinsured_policies = relationship("ReinsuredBy", back_populates="reinsurer", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Cargo(Base):
@@ -51,7 +49,7 @@ class Cargo(Base):
     value = Column(Numeric(12, 2), nullable=True)
 
     policies = relationship("Policy", back_populates="cargo")
-    voyage_carries = relationship("Carries", back_populates="cargo")
+    voyage_carries = relationship("Carries", back_populates="cargo", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Vessel(Base):
@@ -62,7 +60,6 @@ class Vessel(Base):
     imo_number = Column(String(20), unique=True, nullable=False)
     tonnage = Column(Integer, nullable=True)
     flag = Column(String(50), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
 
     policies = relationship("Policy", back_populates="vessel")
     voyages = relationship("Voyage", back_populates="vessel")
@@ -100,14 +97,13 @@ class Voyage(Base):
     vessel_id = Column(Integer, ForeignKey("VESSEL.vessel_id"), nullable=True)
 
     vessel = relationship("Vessel", back_populates="voyages")
-    carried_cargos = relationship("Carries", back_populates="voyage")
+    carried_cargos = relationship("Carries", back_populates="voyage", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Policy(Base):
     __tablename__ = "POLICY"
     __table_args__ = (
         CheckConstraint("policy_type IN ('HULL', 'CARGO', 'PI')", name="check_policy_type"),
-        CheckConstraint("status IN ('DRAFT', 'QUOTED', 'BOUND', 'ACTIVE', 'CANCELLED')", name="check_policy_status"),
     )
 
     policy_no = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -121,6 +117,8 @@ class Policy(Base):
     liability_limit = Column(Numeric(12, 2), nullable=True)
     status = Column(String(20), default="DRAFT", nullable=False)
     deductible = Column(Numeric(12, 2), default=10000.00, nullable=False)
+
+    underwriting_report = Column(JSON, nullable=True)
     underwriting_decision = Column(String(30), nullable=True)
     risk_score = Column(Integer, nullable=True)
     warranties = Column(Text, nullable=True)
@@ -138,28 +136,25 @@ class Policy(Base):
     underwriter = relationship("Underwriter", back_populates="policies")
     vessel = relationship("Vessel", back_populates="policies")
     cargo = relationship("Cargo", back_populates="policies")
-    claims = relationship("Claim", back_populates="policy")
-    reinsurers = relationship("ReinsuredBy", back_populates="policy")
+    claims = relationship("Claim", back_populates="policy", cascade="all, delete-orphan", passive_deletes=True)
+    reinsurers = relationship("ReinsuredBy", back_populates="policy", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class Claim(Base):
     __tablename__ = "CLAIM"
-    __table_args__ = (
-        CheckConstraint("status IN ('REPORTED', 'UNDER_SURVEY', 'APPROVED', 'SETTLED', 'REJECTED')", name="check_claim_status"),
-    )
 
     claim_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     loss_date = Column(Date, nullable=True)
     claim_amount = Column(Numeric(12, 2), nullable=True)
+    policy_no = Column(Integer, ForeignKey("POLICY.policy_no"), nullable=True)
     status = Column(String(20), default="REPORTED", nullable=False)
-    reserve_amount = Column(Numeric(12, 2), nullable=True)
     deductible_applied = Column(Numeric(12, 2), default=0.00, nullable=False)
     settled_amount = Column(Numeric(12, 2), nullable=True)
+    reserve_amount = Column(Numeric(12, 2), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    policy_no = Column(Integer, ForeignKey("POLICY.policy_no"), nullable=True)
 
     policy = relationship("Policy", back_populates="claims")
-    surveyors = relationship("AssessedBy", back_populates="claim")
+    surveyors = relationship("AssessedBy", back_populates="claim", cascade="all, delete-orphan", passive_deletes=True)
 
 
 class ReinsuredBy(Base):

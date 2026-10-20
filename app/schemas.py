@@ -1,19 +1,18 @@
 from datetime import date
 from decimal import Decimal
-from typing import Optional, Literal, Generic, TypeVar, List
+from typing import Optional, Literal, Generic, TypeVar
 from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")
 
-# ==========================================
-# PAGINATION
-# ==========================================
+
 class PaginatedResponse(BaseModel, Generic[T]):
-    items: List[T]
+    items: list[T]
     total: int
     page: int
     limit: int
     total_pages: int
+
 
 # ==========================================
 # CLIENT
@@ -21,7 +20,6 @@ class PaginatedResponse(BaseModel, Generic[T]):
 class ClientBase(BaseModel):
     name: str = Field(..., max_length=100)
     address: Optional[str] = Field(None, max_length=255)
-    is_active: bool = True
 
 class ClientCreate(ClientBase):
     pass
@@ -29,7 +27,6 @@ class ClientCreate(ClientBase):
 class ClientUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     address: Optional[str] = Field(None, max_length=255)
-    is_active: Optional[bool] = None
 
 class ClientRead(ClientBase):
     client_id: int
@@ -42,7 +39,6 @@ class ClientRead(ClientBase):
 class BrokerBase(BaseModel):
     agency_name: str = Field(..., max_length=100)
     licence_no: str = Field(..., max_length=50)
-    is_active: bool = True
 
 class BrokerCreate(BrokerBase):
     pass
@@ -50,7 +46,6 @@ class BrokerCreate(BrokerBase):
 class BrokerUpdate(BaseModel):
     agency_name: Optional[str] = Field(None, max_length=100)
     licence_no: Optional[str] = Field(None, max_length=50)
-    is_active: Optional[bool] = None
 
 class BrokerRead(BrokerBase):
     broker_id: int
@@ -120,7 +115,6 @@ class VesselBase(BaseModel):
     imo_number: str = Field(..., max_length=20)
     tonnage: Optional[int] = None
     flag: Optional[str] = Field(None, max_length=50)
-    is_active: bool = True
 
 class VesselCreate(VesselBase):
     pass
@@ -130,7 +124,6 @@ class VesselUpdate(BaseModel):
     imo_number: Optional[str] = Field(None, max_length=20)
     tonnage: Optional[int] = None
     flag: Optional[str] = Field(None, max_length=50)
-    is_active: Optional[bool] = None
 
 class VesselRead(VesselBase):
     vessel_id: int
@@ -212,13 +205,8 @@ class PolicyBase(BaseModel):
     vessel_value_covered: Optional[Decimal] = None
     cargo_type: Optional[str] = Field(None, max_length=50)
     liability_limit: Optional[Decimal] = None
-    status: Optional[Literal["DRAFT", "QUOTED", "BOUND", "ACTIVE", "CANCELLED"]] = "DRAFT"
+    status: Optional[str] = "DRAFT"
     deductible: Optional[Decimal] = Decimal("10000.00")
-    underwriting_decision: Optional[str] = Field(None, max_length=30)
-    risk_score: Optional[int] = None
-    warranties: Optional[str] = None
-    awrp_surcharge: Optional[Decimal] = Decimal("0.00")
-    is_active: bool = True
     client_id: Optional[int] = None
     broker_id: Optional[int] = None
     emp_id: Optional[int] = None
@@ -237,13 +225,8 @@ class PolicyUpdate(BaseModel):
     vessel_value_covered: Optional[Decimal] = None
     cargo_type: Optional[str] = Field(None, max_length=50)
     liability_limit: Optional[Decimal] = None
-    status: Optional[Literal["DRAFT", "QUOTED", "BOUND", "ACTIVE", "CANCELLED"]] = None
+    status: Optional[str] = None
     deductible: Optional[Decimal] = None
-    underwriting_decision: Optional[str] = Field(None, max_length=30)
-    risk_score: Optional[int] = None
-    warranties: Optional[str] = None
-    awrp_surcharge: Optional[Decimal] = None
-    is_active: Optional[bool] = None
     client_id: Optional[int] = None
     broker_id: Optional[int] = None
     emp_id: Optional[int] = None
@@ -251,6 +234,12 @@ class PolicyUpdate(BaseModel):
     cargo_id: Optional[int] = None
 
 class PolicyRead(PolicyBase):
+    underwriting_report: Optional[dict] = None
+    underwriting_decision: Optional[str] = None
+    risk_score: Optional[int] = None
+    warranties: Optional[str] = None
+    awrp_surcharge: Decimal = Decimal("0.00")
+    is_active: bool = True
     policy_no: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -259,29 +248,28 @@ class PolicyRead(PolicyBase):
 # CLAIM
 # ==========================================
 class ClaimBase(BaseModel):
+    reserve_amount: Optional[Decimal] = Field(None, ge=0)
     loss_date: Optional[date] = None
     claim_amount: Optional[Decimal] = None
-    status: Optional[Literal["REPORTED", "UNDER_SURVEY", "APPROVED", "SETTLED", "REJECTED"]] = "REPORTED"
-    reserve_amount: Optional[Decimal] = None
+    policy_no: Optional[int] = None
+    status: Optional[str] = "REPORTED"
     deductible_applied: Optional[Decimal] = Decimal("0.00")
     settled_amount: Optional[Decimal] = None
-    is_active: bool = True
-    policy_no: Optional[int] = None
 
 class ClaimCreate(ClaimBase):
     pass
 
 class ClaimUpdate(BaseModel):
+    reserve_amount: Optional[Decimal] = Field(None, ge=0)
     loss_date: Optional[date] = None
     claim_amount: Optional[Decimal] = None
-    status: Optional[Literal["REPORTED", "UNDER_SURVEY", "APPROVED", "SETTLED", "REJECTED"]] = None
-    reserve_amount: Optional[Decimal] = None
+    policy_no: Optional[int] = None
+    status: Optional[str] = None
     deductible_applied: Optional[Decimal] = None
     settled_amount: Optional[Decimal] = None
-    is_active: Optional[bool] = None
-    policy_no: Optional[int] = None
 
 class ClaimRead(ClaimBase):
+    is_active: bool = True
     claim_id: int
     model_config = ConfigDict(from_attributes=True)
 

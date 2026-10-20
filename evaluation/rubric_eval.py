@@ -65,7 +65,7 @@ class UnderwritingEvaluator:
             "sanctions_compliance_percent": sanctions_compliance,
             "sanctions_violations_count": sanctions_violations,
             "score_bounds_violations": score_violations,
-            "overall_status": "PASSED" if (sanctions_violations == 0 and decision_accuracy >= 90.0) else "FAILED",
+            "overall_status": "PASSED" if (sanctions_violations == 0 and decision_accuracy >= 90.0 and score_violations == 0) else "FAILED",
             "cases": case_results
         }
 

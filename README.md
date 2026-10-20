@@ -1,6 +1,8 @@
 # Marine Insurance REST API (FastAPI + MariaDB)
 
-Backend CRUD API built with **FastAPI**, **SQLAlchemy**, and **MariaDB** (running in Podman). This service provides a complete RESTful interface designed specifically for consumption by frontend applications (React, Vue, Next.js, etc.).
+Backend CRUD API built with **FastAPI**, **SQLAlchemy**, and **MariaDB** (running in Podman). This service provides a complete RESTful interface designed specifically for consumption by frontend applications.
+
+> 📱 **Swift / iOS Developers**: Check out the dedicated [Swift / SwiftUI Frontend Handoff Guide](FRONTEND_HANDOFF_SWIFT.md) for ready-to-copy `Codable` structs, `async/await` API Client, and complete SwiftUI views.
 
 ---
 
@@ -11,6 +13,16 @@ Ensure the MariaDB Podman container is running:
 ```bash
 podman start course-mariadb
 ```
+
+First time only, create the container and the tables:
+```bash
+podman machine init && podman machine start
+podman run -d --name course-mariadb -p 3306:3306 \
+  -e MARIADB_ROOT_PASSWORD=mysecretpassword docker.io/library/mariadb:11
+uv run python scripts/init_db.py
+uv run python scripts/seed_data.py
+```
+If port 3306 is already taken (e.g. by a local MySQL), use `-p 3307:3306` and set `DB_PORT=3307` in `.env`.
 
 ### 2. Start the Backend Server
 Run using `uv` (recommended):
@@ -64,25 +76,22 @@ All single-column primary keys are automatically generated using `AUTO_INCREMENT
 
 | Resource | Base Path | Methods | Fields |
 |---|---|---|---|
-| **Clients** | `/api/clients/` | `GET`, `POST`, `PUT`, `DELETE` | `client_id`, `name`, `address`, `is_active` |
-| **Brokers** | `/api/brokers/` | `GET`, `POST`, `PUT`, `DELETE` | `broker_id`, `agency_name`, `licence_no` (Unique), `is_active` |
+| **Clients** | `/api/clients/` | `GET`, `POST`, `PUT`, `DELETE` | `client_id`, `name`, `address` |
+| **Brokers** | `/api/brokers/` | `GET`, `POST`, `PUT`, `DELETE` | `broker_id`, `agency_name`, `licence_no` (Unique) |
 | **Surveyors** | `/api/surveyors/` | `GET`, `POST`, `PUT`, `DELETE` | `surveyor_id`, `name`, `qualification` |
 | **Reinsurers** | `/api/reinsurers/` | `GET`, `POST`, `PUT`, `DELETE` | `reinsurer_id`, `name` |
 | **Cargos** | `/api/cargos/` | `GET`, `POST`, `PUT`, `DELETE` | `cargo_id`, `description`, `value` |
-| **Vessels** | `/api/vessels/` | `GET`, `POST`, `PUT`, `DELETE` | `vessel_id`, `name`, `imo_number` (Unique), `tonnage`, `flag`, `is_active` |
+| **Vessels** | `/api/vessels/` | `GET`, `POST`, `PUT`, `DELETE` | `vessel_id`, `name`, `imo_number` (Unique), `tonnage`, `flag` |
 | **Departments** | `/api/departments/` | `GET`, `POST`, `PUT`, `DELETE` | `dept_id`, `name`, `location` |
 
-### 2. Dependent Entities & Workflow Endpoints
+### 2. Dependent Entities
 
-| Resource | Base Path | Methods | Key Fields & Workflow Actions |
+| Resource | Base Path | Methods | Key Foreign Keys & Details |
 |---|---|---|---|
 | **Underwriters** | `/api/underwriters/` | `GET`, `POST`, `PUT`, `DELETE` | `emp_id`, `name`, `designation`, `dept_id` |
 | **Voyages** | `/api/voyages/` | `GET`, `POST`, `PUT`, `DELETE` | `voyage_id`, `origin_port`, `dest_port`, `depart_date`, `vessel_id` |
-| **Policies** | `/api/policies/` | `GET`, `POST`, `PUT`, `DELETE` | `policy_no`, `policy_type` (`'HULL'`, `'CARGO'`, `'PI'`), `status` (`'DRAFT'`, `'QUOTED'`, `'BOUND'`, `'ACTIVE'`, `'CANCELLED'`), `deductible` (default 10000.00), `underwriting_decision`, `risk_score`, `warranties`, `awrp_surcharge`, `is_active`, `sum_insured`, `premium`, Foreign Keys |
-| **Policy Underwriting** | `/api/policies/{policy_no}/submit-underwriting` | `POST` | Executes underwriting engine, writes score/decision/warranties, transitions status to `'QUOTED'` |
-| **Policy Binding** | `/api/policies/{policy_no}/bind` | `POST` | Binds policy: transitions status from `'QUOTED'`/`'DRAFT'` to `'BOUND'` or `'ACTIVE'` |
-| **Claims** | `/api/claims/` | `GET`, `POST`, `PUT`, `DELETE` | `claim_id`, `loss_date`, `claim_amount`, `status` (`'REPORTED'`, `'UNDER_SURVEY'`, `'APPROVED'`, `'SETTLED'`, `'REJECTED'`), `reserve_amount`, `deductible_applied`, `settled_amount`, `is_active`, `policy_no` |
-| **Claim Settlement** | `/api/claims/{claim_id}/settle` | `POST` | Calculates payout: `max(0, min(claim_amount, sum_insured) - deductible)`, writes `settled_amount` & `deductible_applied`, updates status to `'SETTLED'` |
+| **Policies** | `/api/policies/` | `GET`, `POST`, `PUT`, `DELETE` | `policy_no`, `policy_type` (`'HULL'`, `'CARGO'`, `'PI'`), `issue_date`, `expiry_date`, `premium`, `sum_insured`, `client_id`, `broker_id`, `emp_id`, `vessel_id`, `cargo_id` |
+| **Claims** | `/api/claims/` | `GET`, `POST`, `PUT`, `DELETE` | `claim_id`, `loss_date`, `claim_amount`, `policy_no` |
 
 ### 3. Junction Entities (Many-to-Many with Composite Keys)
 
@@ -91,86 +100,6 @@ All single-column primary keys are automatically generated using `AUTO_INCREMENT
 | **Reinsured By** | `/api/reinsured-by/` | `GET`, `POST`, `PUT`, `DELETE` | `/{policy_no}/{reinsurer_id}` (`share_percent`) |
 | **Assessed By** | `/api/assessed-by/` | `GET`, `POST`, `DELETE` | `/{claim_id}/{surveyor_id}` |
 | **Carries** | `/api/carries/` | `GET`, `POST`, `DELETE` | `/{voyage_id}/{cargo_id}` |
-
----
-
-## 🌊 Marine Insurance Lifecycle Workflow Guide
-
-The complete marine insurance operational lifecycle follows a deterministic 6-step lifecycle:
-
-```mermaid
-flowchart TD
-    A["1. Draft Policy\n(POST /api/policies/)\nstatus='DRAFT'"] --> B["2. Submit Underwriting\n(POST /api/policies/{id}/submit-underwriting)\nRuns sanctions, AIS, RAG & scores risk\nstatus='QUOTED'"]
-    B --> C["3. Bind Policy\n(POST /api/policies/{id}/bind)\nVerifies clearance & bounds\nstatus='BOUND' / 'ACTIVE'"]
-    C --> D["4. File Claim\n(POST /api/claims/)\nstatus='REPORTED'"]
-    D --> E["5. Settle Claim\n(POST /api/claims/{id}/settle)\nPayout = max(0, min(claim, sum_insured) - deductible)\nstatus='SETTLED'"]
-    E --> F["6. Soft Delete Policy\n(DELETE /api/policies/{id})\nis_active=false, status='CANCELLED'"]
-```
-
-### Step 1: Draft Policy (`POST /api/policies/`)
-Creates an initial policy record with status `'DRAFT'`, default deductible `10000.00`, and `is_active=true`.
-```json
-{
-  "policy_type": "HULL",
-  "issue_date": "2026-06-01",
-  "expiry_date": "2027-05-31",
-  "premium": 20000.00,
-  "sum_insured": 500000.00,
-  "deductible": 15000.00,
-  "client_id": 1,
-  "vessel_id": 1
-}
-```
-
-### Step 2: Submit for Underwriting (`POST /api/policies/{policy_no}/submit-underwriting`)
-Synthesizes OFAC SDN sanctions screening, AIS navigational corridor hazards, loss ratios, and Institute Clause warranties. Writes `underwriting_decision`, `risk_score`, `warranties`, and `awrp_surcharge` to the database and transitions status to `'QUOTED'`.
-
-### Step 3: Bind Policy (`POST /api/policies/{policy_no}/bind`)
-Binds the quoted policy, transitioning status to `'BOUND'` or `'ACTIVE'`. Automatically rejects binding if the underwriting engine issued a `'DECLINE'` decision.
-
-### Step 4: File a Claim (`POST /api/claims/`)
-Policyholder reports a loss against the active policy with initial status `'REPORTED'`:
-```json
-{
-  "loss_date": "2026-08-15",
-  "claim_amount": 65000.00,
-  "policy_no": 1
-}
-```
-
-### Step 5: Settle Claim with Deductible (`POST /api/claims/{claim_id}/settle`)
-Executes maritime claim adjustment formula:
-$$\text{payout} = \max\left(0, \min(\text{claim\_amount}, \text{sum\_insured}) - \text{policy.deductible}\right)$$
-Sets `settled_amount` to payout, records `deductible_applied`, and updates status to `'SETTLED'`.
-
-### Step 6: Soft Delete (`DELETE /api/policies/{policy_no}`)
-Soft deletes the policy, setting `is_active=false` and `status='CANCELLED'`. Preserves historical integrity while preventing further binding or active operations.
-
----
-
-## 📄 Standard Paginated Response Envelope & Search Filters
-
-All list queries on `/api/policies/` and `/api/claims/` return standard paginated envelopes:
-
-```json
-{
-  "items": [...],
-  "total": 42,
-  "page": 1,
-  "limit": 20,
-  "total_pages": 3
-}
-```
-
-### Query Parameters
-- `?page=1`: 1-indexed page number (default: `1`)
-- `?limit=20`: Maximum items per page (default: `50`, max: `500`)
-- `?skip=0`: Optional offset override
-- `?search=...`: Case-insensitive search across IDs, names, statuses, and types
-- `?status=...`: Exact filter by status (e.g., `ACTIVE`, `QUOTED`, `REPORTED`, `SETTLED`)
-- `?is_active=true|false`: Filter by active / soft-deleted state
-
----
 
 ---
 
@@ -222,34 +151,57 @@ All list queries on `/api/policies/` and `/api/claims/` return standard paginate
 
 ---
 
-## 🤖 Automated Underwriting & Evaluation Engine
+## ⚡ DBMS Concurrency Control Demonstration
 
-The platform includes an automated marine risk assessment and evaluation engine layered on top of MariaDB:
+To satisfy the DBMS coursework requirement for demonstrating **concurrent transaction execution and ACID properties**, this system includes a live concurrency demonstration modeling **concurrent claims processing against an aggregate policy limit**.
 
-### Endpoints
-- **`POST /api/underwriting/assess`**: Submits a policy application and returns:
-  - `decision`: (`APPROVE`, `APPROVE_WITH_CONDITIONS`, `REFER_TO_SENIOR`, `DECLINE`)
-  - `risk_score`: 1 to 100
-  - `sanctions_cleared`: `true`/`false`
-  - `recommended_premium`: Computed based on risk surcharges and AWRP
-  - `warranties_required`: E.g. BMP West Africa, IACS survey warranty, 48-hour JWC transit notice
-  - `retrieved_guidelines`: Clauses pulled via BM25 RAG from Institute Clauses & JWC manuals.
-- **`GET /api/underwriting/sanctions-check?imo_number=...`**: Real-time screening against OFAC SDN maritime sanctioned vessels and entities.
-- **`POST /api/underwriting/evaluate-engine`**: Executes the deterministic rubric benchmark suite (evaluating sanctions zero-tolerance and risk score boundaries).
+### Scenario:
+A marine policy has an aggregate coverage limit of **$100,000.00**. Two independent adjusters attempt to settle **$60,000.00** claims simultaneously (total = $120,000.00).
 
-### Example Underwriting Request
-```bash
-curl -X POST http://localhost:8000/api/underwriting/assess \
-  -H "Content-Type: application/json" \
-  -d '{
-    "policy_type": "HULL",
-    "sum_insured": 25000000,
-    "imo_number": "IMO9123456",
-    "vessel_age": 18,
-    "origin_port": "Rotterdam",
-    "dest_port": "Singapore"
-  }'
+```mermaid
+sequenceDiagram
+    autonumber
+    actor T1 as Thread 1 (Adjuster A)
+    actor T2 as Thread 2 (Adjuster B)
+    participant DB as MariaDB (Engine)
+
+    Note over T1,T2: PART 2: ACID Locking (SELECT ... FOR UPDATE)
+    T1->>DB: BEGIN TX; SELECT ... FOR UPDATE (Policy #1)
+    activate DB
+    Note over DB: Exclusive X-Lock Acquired by T1
+    T2->>DB: BEGIN TX; SELECT ... FOR UPDATE (Policy #1)
+    Note over T2,DB: Thread 2 BLOCKED waiting for Lock
+    T1->>DB: Read remaining: $100k; Pay $60k; COMMIT
+    deactivate DB
+    Note over DB: T1 releases lock. Remaining = $40k
+    activate DB
+    Note over T2,DB: Thread 2 UNBLOCKS; Reads remaining: $40k
+    T2->>DB: $60k > $40k remaining -> ROLLBACK
+    deactivate DB
+    Note over DB: Consistency Maintained! ($60k paid <= $100k limit)
 ```
+
+### 1. Run Live Interactive Terminal Demo:
+```bash
+uv run python scripts/demo_concurrency.py
+```
+This runs both scenarios in real time and prints the thread-level lock acquisitions, timeouts, and transaction commits/rollbacks.
+
+### 2. Live API Endpoints:
+- **`POST /api/concurrency/demo-race-condition`**: Demonstrates the anomaly when rows are not locked (over-payment breach of $20,000.00).
+- **`POST /api/concurrency/demo-safe-transaction`**: Demonstrates MariaDB row-level locking (`SELECT ... FOR UPDATE`), serializing concurrent transactions and safely rolling back the exceeding transaction.
+
+---
+
+## 🔄 Policy Lifecycle & Claims Settlement
+
+The API models practical marine insurance workflow states:
+- **Policy Lifecycle**: `DRAFT` ➔ `QUOTED` ➔ `BOUND`
+  - `POST /api/policies/{policy_no}/quote`
+  - `POST /api/policies/{policy_no}/bind`
+- **Claims Settlement**:
+  - `POST /api/claims/{claim_id}/settle`: Automatically computes net payout deducting the policy deductible:
+    $$\text{Payout} = \min(\max(0, \text{Claim Amount} - \text{Deductible}), \max(0, \text{Sum Insured} - \text{Prior Payouts}))$$
 
 ---
 
@@ -261,16 +213,92 @@ If you ever need to reset or re-seed the MariaDB database:
    ```bash
    uv run python scripts/init_db.py
    ```
-2. **Apply v2 Database Migrations**:
-   ```bash
-   uv run python scripts/migrate_v2.py
-   ```
-3. **Re-seed Sample Data**:
+2. **Re-seed Sample Data**:
    ```bash
    uv run python scripts/seed_data.py
+   ```
+3. **Run Concurrency Demo**:
+   ```bash
+   uv run python scripts/demo_concurrency.py
    ```
 4. **Run Automated Test Suite**:
    ```bash
    uv run pytest tests/ -v
    ```
 
+
+
+## Underwriting demo
+
+Fathom can assess a draft policy using local rules, claims history, and keyword
+retrieval over the bundled guidelines. The sanctions entries are synthetic
+coursework fixtures. Route checks use port names and fixed geographic areas,
+not a live AIS feed. These inputs do not establish real sanctions clearance.
+
+For an existing database, run the additive migration before starting this version:
+
+```bash
+uv sync --extra dev
+uv run python scripts/migrate_v2.py
+```
+
+New databases created with `scripts/init_db.py` already contain the new columns.
+The migration can be run again without resetting records.
+
+In the iOS app, open a draft or quoted policy, scroll to **Underwriting**, and tap
+**Assess risk**. Enter the vessel age and select a voyage belonging to that vessel.
+The database does not store vessel age, so the form starts at 10 years and shows
+the age used in the saved report. Choosing no voyage skips route assessment.
+
+The assessment saves a risk score, decision, conditions, surcharge, and supporting
+guideline excerpts. It fills the premium only when the policy has no premium.
+Decisions are `APPROVE`, `APPROVE_WITH_CONDITIONS`, `REFER_TO_SENIOR`, or `DECLINE`.
+Declined and referred policies cannot be bound. Senior review remains a manual
+process outside this demo; it has no approval override endpoint.
+
+The existing Quote and Bind workflow still works without an assessment. Binding
+always screens the linked client and vessel against the fixtures, including when
+coverage is created directly as BOUND or ACTIVE. Assessed policies also recheck
+risk at binding time. Changing assessment inputs on a draft clears its old report.
+Bound coverage rejects changes to those inputs.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/underwriting/assess` | Preview risk without saving a policy |
+| `GET /api/underwriting/sanctions-check` | Check the local sanctions fixtures |
+| `POST /api/underwriting/evaluate-engine` | Run four synthetic benchmark cases |
+| `POST /api/policies/{policy_no}/submit-underwriting` | Assess and save a policy report |
+
+Example submission body:
+
+```json
+{"vessel_age": 12, "voyage_id": 1}
+```
+
+The preview endpoint also requires `policy_type` and positive `sum_insured`.
+Supplied entity IDs must exist; a selected voyage must belong to the selected
+vessel. Database identities take precedence over supplied names.
+
+Policy and claim list endpoints keep returning arrays with `X-Total-Count` for
+existing clients. Passing `page=1&limit=50` opts into an object containing `items`,
+`total`, `page`, `limit`, and `total_pages`. Normal DELETE calls still permanently
+remove records and apply database cascades. Pass `permanent=false` to archive a
+policy or claim instead, and use `is_active` to filter lists. Archiving a policy
+cancels it and blocks further settlements without deleting its claims.
+
+Run backend tests against a separate seeded database:
+
+```bash
+DB_NAME=marine_insurance_underwriting_test uv run python scripts/init_db.py
+DB_NAME=marine_insurance_underwriting_test uv run python scripts/seed_data.py
+DB_NAME=marine_insurance_underwriting_test uv run pytest tests/ -q
+```
+
+Generate the iOS project with `xcodegen generate --spec ios/project.yml`.
+`FathomTests` covers report decoding and binding decisions.
+`UnderwritingUITests` needs the API running at `http://127.0.0.1:8000` and exercises
+assessment, voyage selection, saved results, binding, and a declined policy.
+
+See the [short demo](docs/underwriting/demo.mp4) and screenshots of an
+[assessment](docs/underwriting/assessment.png) and a
+[declined policy](docs/underwriting/declined.png).
